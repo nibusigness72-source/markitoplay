@@ -8,7 +8,7 @@
   var CONFIG = {
     TIME: 120,             // pura game kitne second ka (120 = 2 minute)
     POUR_POINTS: 5,        // ek baar rang daalne ke point
-    FULL_POINTS: 20,       // ek dabba poora (4 rang, sab same) bharne ke extra point
+    FULL_POINTS: 10,       // ek dabba poora (4 rang, sab same) bharne ke extra point
     SCORE_CAP: 1000,       // ek game ka sabse zyada score jo save hoga (Firebase rule ke andar)
 
     TUBE_SIZE: 4,          // ek dabbe me kitne rang aate hain
@@ -18,7 +18,7 @@
     MAX_COLORS: 9,         // sabse zyada kitne rang (isse zyada nahi badhega)
 
     BG_CHANGE: 30,         // peeche ka nazara har itne second me badle
-    WIN_DELAY: 1.8,        // level poora hone ke baad naya level kitni der me aaye (second)
+    WIN_DELAY: 1.1,        // level poora hone ke baad naya level kitni der me aaye (second)
     POUR_TIME: 0.9         // ek baar rang daalne me kitna samay lage (chhota = tez)
   };
 
