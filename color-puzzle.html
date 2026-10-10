@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Color Puzzle - PLAY&amp;WIN</title>
+  <link rel="stylesheet" href="color-puzzle.css">
+</head>
+<body>
+
+  <canvas id="game"></canvas>
+
+  <!-- Shuru wali screen -->
+  <div class="overlay" id="menu">
+    <div class="card">
+      <div class="title">COLOR PUZZLE</div>
+      <ul class="rules">
+        <li>⏱ Time: <b>2 minute</b> &nbsp;•&nbsp; Level jaldi-jaldi badhte hain</li>
+        <li>Ek <b>dabba</b> dabao (wo upar uthega), phir doosra dabao, <b>rang</b> usme chala jayega</li>
+        <li>Rang tabhi jaata hai jab doosre dabbe ke <b>upar ka rang same</b> ho, ya wo dabba khaali ho</li>
+        <li>Har dabba ek rang se bhar do. Ek baar rang dalna = <b class="good">+5</b>, dabba poora bhara = <b class="good">+20</b></li>
+        <li>Fas jao to <b>🔄 Skip</b> dabao, naya level aa jayega</li>
+      </ul>
+      <button class="btn" id="startBtn">▶ START</button>
+      <a class="back" href="play.html">← Back</a>
+    </div>
+  </div>
+
+  <!-- Game khatam hone par -->
+  <div class="overlay hidden" id="over">
+    <div class="card">
+      <div class="title small">TIME UP!</div>
+      <div class="final-label">Your Score</div>
+      <div class="final-score" id="finalScore">0</div>
+      <div class="note" id="finalNote"></div>
+      <button class="btn" id="againBtn">↻ PLAY AGAIN</button>
+      <a class="back" href="play.html">← Back to Games</a>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="score.js"></script>
+  <script src="color-sound.js"></script>
+  <script src="color-puzzle.js"></script>
+</body>
+</html>
