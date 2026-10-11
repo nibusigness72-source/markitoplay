@@ -7,7 +7,7 @@
   // ================= SETTINGS (sirf yahin badalna) =================
   var CONFIG = {
     TIME: 120,             // pura game kitne second ka (120 = 2 minute)
-    POUR_POINTS: 5,        // ek baar rang daalne ke point
+    POUR_POINTS: 3,        // ek baar rang daalne ke point
     FULL_POINTS: 10,       // ek dabba poora (4 rang, sab same) bharne ke extra point
     SCORE_CAP: 1000,       // ek game ka sabse zyada score jo save hoga (Firebase rule ke andar)
 
