@@ -7,7 +7,7 @@
   var CONFIG = {
     TIME: 120,            // pura game kitne second ka (120 = 2 minute)
     QUESTION_TIME: 3,     // ek sawal kitne second dikhe, phir khud badal jaye
-    POINTS: 15,           // sahi jawab ke point
+    POINTS: 14,           // sahi jawab ke point
     SCORE_CAP: 1000,      // ek game ka sabse zyada score jo save hoga (Firebase rule ke andar)
 
     // ---- sawal kitne mushkil: SIRF NEECHE KE NUMBER BADLO ----
