@@ -1,9 +1,9 @@
 // snake-sound.js - Snake Game ki awaazein (koi mp3 nahi, sab code se banti hain)
-// eat() fruit khana | coin() coin | bite(v) katna/marna | kill() dushman mara | boost() speed
+// eat() fruit khana (gaay ke ghaas chabane jaisi narm awaaz) | coin() coin | bite(v) katna/marna | kill() dushman mara | boost() speed
 // slither() saamp chalne ki halki awaaz | pot() potion mila | gadget() gadget chala | tick(n) 3-2-1 | respawn() | end()
 
 var SnakeSound = (function () {
-  var ctx = null, master = null, noiseBuf = null, enabled = true;
+  var ctx = null, master = null, noiseBuf = null, enabled = true, lastEat = 0;
 
   function unlock() {
     if (!ctx) {
@@ -33,30 +33,41 @@ var SnakeSound = (function () {
     o.start(t); o.stop(t + dur + 0.02);
   }
 
-  function noise(dur, vol, ftype, f1, f2, delay, attack) {
+  // q = filter ki "tez-ness" (chhota number = narm/phaila hua, bada = patla)
+  function noise(dur, vol, ftype, f1, f2, delay, attack, q) {
     var t = ctx.currentTime + (delay || 0), s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
     s.buffer = noiseBuf; s.loop = true;
     f.type = ftype;
+    if (q) f.Q.value = q;
     f.frequency.setValueAtTime(f1, t);
     f.frequency.exponentialRampToValueAtTime(f2, t + dur);
     g.gain.setValueAtTime(0.001, t);
     g.gain.linearRampToValueAtTime(vol, t + dur * (attack || 0.03));
     g.gain.exponentialRampToValueAtTime(0.001, t + dur);
     s.connect(f); f.connect(g); g.connect(master);
-    s.start(t); s.stop(t + dur + 0.02);
+    s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.02);
   }
 
   function on() { return enabled && ctx; }
 
   return {
     unlock: unlock,
-    // Fruit kaatna: kad-kad ki chabane wali awaaz
+    // Fruit khana: gaay ghaas chabati hai waisi narm, geeli "krrmp-krrmp" awaaz
+    // (do baar chabana: pehle halka patla sarsar, phir neeche ki taraf dabaa hua munch)
     eat: function () {
       if (!on()) return;
-      var k = 0.9 + Math.random() * 0.3;
-      noise(0.06, 0.4, 'bandpass', 1800 * k, 900, 0, 0.1);
-      tone(330 * k, 190, 0.07, 0.28, 'triangle');
-      noise(0.05, 0.3, 'bandpass', 2200 * k, 1200, 0.07, 0.1);
+      var now = ctx.currentTime;
+      if (now - lastEat < 0.09) return;        // bahut tez khane par awaaz ka dher na lage
+      lastEat = now;
+      var k = 0.85 + Math.random() * 0.3;
+      // chaba 1
+      noise(0.13, 0.55, 'bandpass', 1000 * k, 380 * k, 0, 0.22, 0.7);   // patta/ghaas ka sarsar
+      noise(0.07, 0.22, 'lowpass', 700, 250, 0.01, 0.2);                 // munh ki geeli awaaz
+      tone(150 * k, 80, 0.1, 0.3, 'sine');                               // jabda dabne ki halki dhap
+      // chaba 2 (thoda dheema, thoda gehra)
+      noise(0.12, 0.42, 'bandpass', 800 * k, 330 * k, 0.11, 0.22, 0.7);
+      noise(0.06, 0.18, 'lowpass', 600, 220, 0.12, 0.2);
+      tone(120 * k, 70, 0.09, 0.22, 'sine', 0.11);
     },
     // Coin: ting
     coin: function () {
