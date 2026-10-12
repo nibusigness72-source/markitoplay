@@ -7,8 +7,8 @@
   var CONFIG = {
     TIME: 60,             // game kitne second ka
     STUCK_RESET: 3,       // board bhar jaye aur koi chaal na bache to kitne second baad saaf ho
-    COMBO_MAX: 5,         // combo ka sabse bada multiplier (5x se upar nahi)
-    COMBO_GRACE: 2,       // line kaate bina kitni chaal tak combo bacha rahe (0 = turant tut jaye)
+    COMBO_MAX: 3,         // combo ka sabse bada multiplier (5x se upar nahi)
+    COMBO_GRACE: 1,       // line kaate bina kitni chaal tak combo bacha rahe (0 = turant tut jaye)
     COMBO_MULTIPLY: true, // true = points x combo (2x me double). false = sirf label dikhe, points wahi
     PERFECT_BONUS: 30,    // poora board saaf ho jaye to extra points (0 = nahi)
     SCORE_CAP: 1000,      // ek game ka sabse zyada score jo save hoga (Firebase rule ke andar rakho)
