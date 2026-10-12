@@ -28,6 +28,7 @@ var CONFIG = {
   CLUSTER_SPREAD: 38,    // gucche ke fruit kitne paas-paas (bada = phaile hue)
   COIN_COUNT: 25,        // map par coin kitne (zyada rakhoge to bahut coin aayenge)
   COIN_POINTS: 10,        // ek coin ke point
+  COIN_SIZE: 1.6,
   POTION_COUNT: 8,       // map par gadget (potion) kitne
   DROP_FRUITS: 20,       // saamp marne par kitne fruit girenge
   DROP_POINTS: 10,       // un sab fruit ke kul point (aadha khaya to aadhe point)
@@ -579,7 +580,7 @@ function draw() {
         sz = (f.drop ? 24 : 27) * fs * 1.333;
         ctx.drawImage(emojiSprite(f.e), f.x - sz / 2, yy - sz / 2, sz, sz);
       } else if (f.t === 1) {
-        sz = 32 * fs;
+        sz = 32 * fs * CONFIG.COIN_SIZE;
         ctx.drawImage(coinSpr, f.x - sz / 2, yy - sz / 2, sz, sz);
       } else {
         var P = POTS[f.k];
