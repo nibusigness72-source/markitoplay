@@ -16,18 +16,18 @@ var CONFIG = {
 
   BASE_SPEED: 200,       // SABHI saamp ki ek jaisi speed (badhao/ghatao)
   BOOST_MULT: 2,       // speed dabane par kitni guna tez
-  BOOST_COST: 10,         // speed par ek baar mein kitne point katenge
+  BOOST_COST: 5,         // speed par ek baar mein kitne point katenge
   BOOST_COST_EVERY: 1.5, // kitne second mein ek baar point katenge
 
   // ---- khana ----
   FRUIT_COUNT: 450,      // map par fruit kitne rahenge
-  FRUIT_POINTS: 1.4,       // ek fruit ke point
+  FRUIT_POINTS: 1,       // ek fruit ke point
   CLUSTER_CHANCE: 0.12,  // kitni baar fruit 4-5 ke gucche mein girenge (0 = kabhi nahi, 0.3 = bahut zyada gucche)
   CLUSTER_MIN: 4,        // gucche mein kam se kam fruit
   CLUSTER_MAX: 5,        // gucche mein zyada se zyada fruit
   CLUSTER_SPREAD: 38,    // gucche ke fruit kitne paas-paas (bada = phaile hue)
   COIN_COUNT: 25,        // map par coin kitne (zyada rakhoge to bahut coin aayenge)
-  COIN_POINTS: 10,        // ek coin ke point
+  COIN_POINTS: 5,        // ek coin ke point
   COIN_SIZE: 1.6,
   POTION_COUNT: 8,       // map par gadget (potion) kitne
   DROP_FRUITS: 20,       // saamp marne par kitne fruit girenge
