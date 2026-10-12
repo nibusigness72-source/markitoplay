@@ -22,6 +22,7 @@
     'target-hit':   { name: 'Target Hit',   icon: '🎯', bg: '#b91c1c' },
     'math-quiz':  { name: 'Math Quiz',  icon: '➕', bg: '#2563eb' },
     'color-puzzle':  { name: 'Color Puzzle',  icon: '🧪', bg: '#0f766e' },
+    'snake-game' : {name:'Snake Game',icon:'🐍',bg:' #0ea5e9'},
   };
   var REF = { name: 'Referral Reward', icon: '👥', bg: '#0e7490' };
 
