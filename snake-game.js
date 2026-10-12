@@ -7,7 +7,7 @@ var CONFIG = {
 
   // ---- sab kuch bada dikhana ----
   SIZE_UP: 1.3,          // saamp, fruit, coin sab itna guna bada dikhega (1 = pehle jaisa, 2 = double). Physics wahi rahegi
-  FRUIT_SIZE: 1.7,       // fruit/coin/potion ko upar se aur itna guna bada (1 = normal, 2 = double)
+  FRUIT_SIZE: 1.6,       // fruit/coin/potion ko upar se aur itna guna bada (1 = normal, 2 = double)
 
   // ---- robot saamp (phone hang na ho isliye sirf paas ke chalte hain) ----
   ROBOT_COUNT: 7,        // tumhare aas-paas ek samay mein kitne robot saamp (zyada = bheed, par phone dheema)
@@ -21,7 +21,7 @@ var CONFIG = {
 
   // ---- khana ----
   FRUIT_COUNT: 450,      // map par fruit kitne rahenge
-  FRUIT_POINTS: 2,       // ek fruit ke point
+  FRUIT_POINTS: 1.4,       // ek fruit ke point
   CLUSTER_CHANCE: 0.12,  // kitni baar fruit 4-5 ke gucche mein girenge (0 = kabhi nahi, 0.3 = bahut zyada gucche)
   CLUSTER_MIN: 4,        // gucche mein kam se kam fruit
   CLUSTER_MAX: 5,        // gucche mein zyada se zyada fruit
@@ -304,7 +304,7 @@ function die(s, by) {
     Snd.bite(Math.max(0, 1 - d / 900) * 0.7);
     if (by === player && player.alive) {
       kills++;
-      banner('+1  You defeated the worm!');
+      banner('+1  You defeated the snack!');
       bubble = { t: 1.6, e: EMOJIS[rnd(EMOJIS.length)] };
       Snd.kill();
     }
