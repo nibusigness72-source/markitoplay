@@ -7,7 +7,7 @@ var CONFIG = {
 
   // ---- sab kuch bada dikhana ----
   SIZE_UP: 1.3,          // saamp, fruit, coin sab itna guna bada dikhega (1 = pehle jaisa, 2 = double). Physics wahi rahegi
-  FRUIT_SIZE: 1.2,       // fruit/coin/potion ko upar se aur itna guna bada (1 = normal, 2 = double)
+  FRUIT_SIZE: 1.7,       // fruit/coin/potion ko upar se aur itna guna bada (1 = normal, 2 = double)
 
   // ---- robot saamp (phone hang na ho isliye sirf paas ke chalte hain) ----
   ROBOT_COUNT: 7,        // tumhare aas-paas ek samay mein kitne robot saamp (zyada = bheed, par phone dheema)
@@ -27,7 +27,7 @@ var CONFIG = {
   CLUSTER_MAX: 5,        // gucche mein zyada se zyada fruit
   CLUSTER_SPREAD: 38,    // gucche ke fruit kitne paas-paas (bada = phaile hue)
   COIN_COUNT: 25,        // map par coin kitne (zyada rakhoge to bahut coin aayenge)
-  COIN_POINTS: 5,        // ek coin ke point
+  COIN_POINTS: 10,        // ek coin ke point
   POTION_COUNT: 8,       // map par gadget (potion) kitne
   DROP_FRUITS: 20,       // saamp marne par kitne fruit girenge
   DROP_POINTS: 10,       // un sab fruit ke kul point (aadha khaya to aadhe point)
@@ -37,7 +37,7 @@ var CONFIG = {
 
   // ---- gadget ----
   GADGET_TIME: 10,       // gadget kitne second chalta hai
-  MAGNET_RADIUS: 220,    // magnet kitni door tak khinchta hai
+  MAGNET_RADIUS: 150,    // magnet kitni door tak khinchta hai
   ZOOM: 1,               // 1 = normal, bada number = zyada map dikhega, chhota = paas se
   PLAYER_SKIN: 'random', // 'random' ya 0 se 7 (apne saamp ka design)
   SAVE_CAP: 1000         // ek baar mein zyada se zyada kitna score save hoga
