@@ -121,5 +121,5 @@
   document.querySelectorAll('.tab').forEach(function (b) {
     b.addEventListener('click', function () { setTimeout(function () { decorate(); refresh(); }, 0); });
   });
-  setInterval(refresh, 60000);   // subah 8 baje naya din/hafta/mahina shuru hote hi "Pending" dikhe
+  setInterval(refresh, 300000);   // subah 8 baje naya din/hafta/mahina shuru hote hi "Pending" dikhe
 })();

@@ -129,4 +129,4 @@ topBtns.forEach(function (btn) {
 });
 
 // Har 30 second mein list apne aap naya ho jaati hai
-setInterval(function () { load(true); }, 30000);
+setInterval(function () { load(true); }, 300000);
