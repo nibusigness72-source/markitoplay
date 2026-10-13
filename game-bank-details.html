@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game Bank Details</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
+:root { --card: #0f1b47; --border: #1f3a8a; --cyan: #22d3ee; --yellow: #facc15; --green: #22c55e; --text: #fff; --muted: #9fb0d9; }
+body { background: linear-gradient(180deg, #060c24, #0a1233); color: var(--text); min-height: 100vh; padding: 14px; line-height: 1.6; }
+.app { max-width: 480px; margin: 0 auto; padding-bottom: 30px; }
+.header { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.back-btn { color: var(--text); text-decoration: none; font-size: 24px; }
+.header h1 { font-size: 20px; }
+.hero { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, #12307a, #0f1b47); border: 1px solid var(--cyan); border-radius: 20px; padding: 16px; margin-bottom: 14px; }
+.hic { width: 54px; height: 54px; border-radius: 50%; border: 2px solid var(--yellow); display: flex; align-items: center; justify-content: center; font-size: 28px; flex: none; }
+.hero h2 { font-size: 18px; color: var(--yellow); }
+.hero p { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.sample { display: none; background: rgba(250,204,21,.1); border: 1px solid var(--yellow); color: #fde68a; border-radius: 14px; padding: 10px 12px; font-size: 13px; margin-bottom: 14px; }
+.form { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 16px; }
+.field { display: flex; align-items: center; gap: 8px; background: #0a1233; border: 1px solid var(--border); border-radius: 14px; padding: 12px; margin-bottom: 12px; }
+.field .ico { font-size: 18px; flex: none; }
+.field b { font-size: 14px; white-space: nowrap; }
+.field .val { flex: 1; min-width: 0; color: var(--cyan); font-size: 14px; word-break: break-all; text-align: right; }
+.copy { flex: none; background: transparent; border: 1px solid var(--cyan); color: var(--cyan); border-radius: 10px; padding: 5px 9px; font-size: 12px; font-weight: 700; }
+.or { text-align: center; margin: 14px 0; position: relative; color: var(--muted); font-weight: 700; }
+.or::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--border); }
+.or span { position: relative; background: var(--card); padding: 0 12px; }
+.apps { text-align: center; font-weight: 800; color: var(--muted); margin: 2px 0 12px; }
+.gpay { color: #4285f4; } .phonepe { color: #a78bfa; } .paytm { color: #38bdf8; }
+.note { background: rgba(34,211,238,.08); border: 1px solid var(--cyan); border-radius: 14px; padding: 12px; margin-top: 14px; font-size: 13px; color: #dbe5ff; }
+.note b { color: var(--yellow); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <a href="settings.html" class="back-btn">←</a>
+    <h1>Game Bank Details</h1>
+  </header>
+
+  <section class="hero">
+    <div class="hic">🏦</div>
+    <div><h2>PLAY&amp;WIN Game Account</h2><p>Account details of the game</p></div>
+  </section>
+
+  <div class="sample" id="sample">⚠️ These are <b>sample</b> details only. Do not send money to them.</div>
+
+  <section class="form">
+    <div class="field"><span class="ico">🧾</span><b>Account Holder:</b><span class="val" id="holder"></span><button class="copy" data-for="holder">Copy</button></div>
+    <div class="field"><span class="ico">🏦</span><b>Game Bank Name:</b><span class="val" id="bank"></span><button class="copy" data-for="bank">Copy</button></div>
+    <div class="field"><span class="ico">🔢</span><b>Game Account No:</b><span class="val" id="account"></span><button class="copy" data-for="account">Copy</button></div>
+    <div class="field"><span class="ico">🏷️</span><b>Game IFSC:</b><span class="val" id="ifsc"></span><button class="copy" data-for="ifsc">Copy</button></div>
+
+    <div class="or"><span>OR</span></div>
+
+    <div class="field"><span class="ico">💳</span><b>Game UPI ID:</b><span class="val" id="upi"></span><button class="copy" data-for="upi">Copy</button></div>
+    <div class="apps"><span </div>
+
+    <div class="note">
+      <b>Note:</b> These details are for sending points from one game to another, so that a game can be unlocked.<br>
+      यह जानकारी एक game से दूसरे game में points भेजने के लिए है, ताकि game unlock हो सके।
+    </div>
+  </section>
+
+</div>
+
+<script>
+// ===== YAHAN APNI ASLI DETAILS LIKHO (sirf yahi ek jagah badalni hai) =====
+var DETAILS = {
+  holder:  'PLAY&WIN GAME',        // account ka naam
+  bank:    'Example Bank',         // bank ka naam
+  account: '1234567890',           // account number (abhi namuna)
+  ifsc:    'EXMP0000123',          // IFSC code (abhi namuna)
+  upi:     'playwin@example'       // UPI ID (abhi namuna)
+};
+var IS_SAMPLE = true;              // asli details likhne ke baad  false  kar do (tab upar ka peela message hat jayega)
+// ===========================================================================
+
+(function () {
+  Object.keys(DETAILS).forEach(function (k) { var e = document.getElementById(k); if (e) e.textContent = DETAILS[k]; });
+  if (IS_SAMPLE) document.getElementById('sample').style.display = 'block';
+  document.querySelectorAll('.copy').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var text = DETAILS[b.getAttribute('data-for')] || '';
+      try { navigator.clipboard.writeText(text); b.textContent = 'Copied ✓'; } catch (e) { b.textContent = 'Copy nahi hua'; }
+      setTimeout(function () { b.textContent = 'Copy'; }, 1500);
+    });
+  });
+})();
+</script>
+</body>
+</html>
