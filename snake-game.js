@@ -304,7 +304,7 @@ function die(s, by) {
     Snd.bite(Math.max(0, 1 - d / 900) * 0.7);
     if (by === player && player.alive) {
       kills++;
-      banner('+1  You defeated the snack!');
+      banner('+1  You defeated the snake!');
       bubble = { t: 1.6, e: EMOJIS[rnd(EMOJIS.length)] };
       Snd.kill();
     }
@@ -624,11 +624,24 @@ function loop(now) {
 }
 
 // ---------- game shuru / khatam ----------
+// Phone seedha (portrait) ho to poora game 90 degree ghuma kar lamba (landscape) kar dete hain - Fruit Cut jaisa
+var portrait = false, wrap = $('wrap');
 function setup() {
   dpr = Math.min(2, window.devicePixelRatio || 1);   // 2 se zyada nahi: phone tez chalta hai
-  W = window.innerWidth; H = window.innerHeight;
+  var iw = window.innerWidth, ih = window.innerHeight;
+  portrait = ih > iw;
+  W = portrait ? ih : iw;                             // game ki chaudai
+  H = portrait ? iw : ih;                             // game ki unchai
+  wrap.style.width = W + 'px';
+  wrap.style.height = H + 'px';
+  wrap.style.transform = portrait ? 'translateX(' + iw + 'px) rotate(90deg)' : 'none';
   cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+// ungli ki jagah (screen) -> game ki jagah (ghumne ke baad)
+function toLocal(e) {
+  return portrait ? { x: e.clientY, y: window.innerWidth - e.clientX } : { x: e.clientX, y: e.clientY };
 }
 
 function newGame() {
@@ -692,16 +705,16 @@ window.addEventListener('pointerdown', function (e) {
   Snd.unlock();
   if (state === 'over') return;
   if (!started) { started = true; elHint.style.display = 'none'; }
-  var onBoost = t && t.closest && t.closest('#boost'), haveMove = false, k;
+  var onBoost = t && t.closest && t.closest('#boost'), haveMove = false, k, p = toLocal(e);
   for (k in ptrs) if (ptrs[k] === 'move') haveMove = true;
   if (onBoost || haveMove) ptrs[e.pointerId] = 'boost';
-  else { ptrs[e.pointerId] = 'move'; joy = { x: e.clientX, y: e.clientY, kx: e.clientX, ky: e.clientY }; }
+  else { ptrs[e.pointerId] = 'move'; joy = { x: p.x, y: p.y, kx: p.x, ky: p.y }; }
   boosting = boostOn();
 });
 
 window.addEventListener('pointermove', function (e) {
   if (ptrs[e.pointerId] !== 'move' || !joy) return;
-  var dx = e.clientX - joy.x, dy = e.clientY - joy.y, m = Math.sqrt(dx * dx + dy * dy);
+  var p = toLocal(e), dx = p.x - joy.x, dy = p.y - joy.y, m = Math.sqrt(dx * dx + dy * dy);
   if (m > 56) { dx = dx / m * 56; dy = dy / m * 56; }
   joy.kx = joy.x + dx; joy.ky = joy.y + dy;
   if (m > 8 && player && player.alive) player.tAng = Math.atan2(dy, dx);
@@ -728,5 +741,6 @@ window.addEventListener('keyup', function (e) {
 gBtn.forEach(function (b, k) { b.addEventListener('click', function () { useGadget(k); }); });
 againBtn.addEventListener('click', newGame);
 window.addEventListener('resize', setup);
+window.addEventListener('orientationchange', function () { setTimeout(setup, 150); });
 
 newGame();
