@@ -23,6 +23,7 @@
     'math-quiz':  { name: 'Math Quiz',  icon: '➕', bg: '#2563eb' },
     'color-puzzle':  { name: 'Color Puzzle',  icon: '🧪', bg: '#0f766e' },
     'snake-game' : {name:'Snake Game',icon:'🐍',bg:' #0ea5e9'},
+        'traffic-racer': { name: 'Traffic Racer', icon: '🏎️', bg: '#ea580c' },
   };
   var REF = { name: 'Referral Reward', icon: '👥', bg: '#0e7490' };
 
