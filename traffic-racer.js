@@ -981,9 +981,12 @@ var TYPES = [
       if (rel < -8000) { cars.splice(i, 1); continue; }              // bahut peeche reh gayi: aage nayi gadi banegi
       if (rel > AL) { cars.splice(i, 1); }                            // bahut aage: hata do
     }
-        var MAXC = Math.round(C.TRAFFIC_COUNT * Math.max(1.2, C.SPAWN_RANGE));
+                var MAXC = maxCars();
     var tries = 0, nc;
     while (cars.length < MAXC && tries++ < 12) { nc = newCar(rnd(AMIN, AMAX)); if (nc) cars.push(nc); }
+        var zn = 0, ZT = Math.round(C.TRAFFIC_COUNT * DRAW / 200 * 1.15), q, zr;
+    for (q = 0; q < cars.length; q++) { zr = relOf(cars[q].z); if (zr > 0 && zr < DRAW * SEG * 1.15) zn++; }
+    tries = 0; while (zn < ZT && tries++ < 6) { nc = newCar(rnd(DRAW * SEG * 1.02, DRAW * SEG * 1.15)); if (nc) { cars.push(nc); zn++; } }
     if (cars.length < MAXC * 0.5) { nc = newCar(-rnd(3000, 6500)); if (nc) cars.push(nc); }
 
     // takkar aur "sata kar nikalna"
