@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Space Shooter - PLAY&amp;WIN</title>
+  <link rel="stylesheet" href="space-shooter.css">
+</head>
+<body>
+
+  <div id="wrap">
+    <canvas id="game"></canvas>
+    <a href="play.html" class="back">←</a>
+
+    <!-- Start screen -->
+    <div class="overlay" id="menu">
+      <div class="card">
+        <h2>🚀 Space Shooter</h2>
+        <p>
+          👆 Ungli screen par kahin bhi rakh kar ghumao = <b>jahaj ungli ke saath ghoomega</b> (upar, neeche, left, right)<br>
+          🔫 Goli apne aap chalti hai<br>
+          👾 Alien marne par <b>+1 point</b><br>
+          🎁 Girte gift lo: goli badhao, naya jahaj, speed, shield, boost attack<br>
+          🪨 Patthar aur alien ki goli se bacho<br>
+          💥 Jahaj toota to <b>5 second</b> rukna padega
+        </p>
+        <button class="gold-btn" id="startBtn">Start Game</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="overlay hidden" id="over">
+      <div class="card">
+        <h2>⏱️ Game Over!</h2>
+        <div class="big" id="finalScore">0</div>
+        <p id="finalStats"></p>
+        <p class="note" id="finalNote"></p>
+        <button class="gold-btn" id="againBtn">Play Again</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="score.js"></script>
+  <script src="space-sound.js"></script>
+  <script src="space-shooter.js"></script>
+</body>
+</html>

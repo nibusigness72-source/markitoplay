@@ -167,6 +167,7 @@ body {
 .t12 { background: linear-gradient(135deg, #14b8a6, #3b82f6); }
 .t13 { background: linear-gradient(135deg, #16a34a, #0ea5e9); }
 .t15 { background: linear-gradient(135deg, #f97316, #b91c1c); }
+.t14 { background: linear-gradient(135deg, #6d28d9, #0ea5e9); }
 .badge {
   position: absolute;
   top: 0;
