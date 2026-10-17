@@ -78,7 +78,7 @@ function errorText(err) {
     case 'auth/too-many-requests':
       return 'Bahut baar try kiya, thodi der baad try karo';
     case 'auth/billing-not-enabled':
-      return 'Firebase mein Blaze plan on karo, ya test number use karo';
+      return 'please sing in with google';
     case 'auth/operation-not-allowed':
       return 'Firebase mein Phone sign-in on nahi hai ya ye region band hai';
     case 'auth/unauthorized-domain':
