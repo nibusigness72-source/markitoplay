@@ -55,11 +55,11 @@
     // hp = kitni goli mein marega, pts = marne par point, size = alien ka size,
     // fire = [kam se kam, zyada se zyada] second baad goli maarega ([0,0] = kabhi goli nahi maarega)
     ENEMIES: {
-      beetle: { hp: 1,  pts: 3,  size: 46,  fire: [0.3, 1] },
-      moth:   { hp: 2,  pts: 3,  size: 48,  fire: [0.2, 0.8] },
-      purple: { hp: 3,  pts: 3,  size: 52,  fire: [0.5, 1] },
-      crab:   { hp: 4,  pts: 3,  size: 52,  fire: [0.2, 0.6] },
-      scarab: { hp: 6,  pts: 3,  size: 56,  fire: [0.1, 0.3] },
+      beetle: { hp: 2,  pts: 3,  size: 46,  fire: [0.5, 1] },
+      moth:   { hp: 3,  pts: 3,  size: 48,  fire: [0.4, 0.8] },
+      purple: { hp: 4,  pts: 3,  size: 52,  fire: [0.7, 1] },
+      crab:   { hp: 5,  pts: 3,  size: 52,  fire: [0.4, 0.6] },
+      scarab: { hp: 7,  pts: 3,  size: 56,  fire: [0.2, 0.3] },
       boss:   { hp: 300, pts: 30, size: 150, fire: [0.9, 1.6] }
     },
     ENEMY_BULLET_SPEED: 240, // alien ki goli ki raftaar
@@ -384,13 +384,27 @@
       }
     });
   }
-  function enemyBulletSpr() {
-    return spr('ebul', 22, 30, function (g) {
+  function enemyBulletSpr() {                                    // alien ki goli: steel ka khol + tapta laal nok + aag ki poonchh
+    return spr('ebul', 22, 42, function (g) {
       g.translate(11, 0);
-      g.shadowColor = '#ff3a5a'; g.shadowBlur = 8;
-      g.fillStyle = lg(g, 0, 2, 0, 28, [[0, '#ffe0e8'], [0.3, '#ff5a7a'], [1, '#b0103a']]);
-      g.beginPath(); g.moveTo(0, 28); g.bezierCurveTo(10, 18, 8, 6, 0, 2); g.bezierCurveTo(-8, 6, -10, 18, 0, 28); g.fill();
-      g.shadowBlur = 0; g.fillStyle = '#fff'; circ(g, 0, 14, 3); g.fill();
+      g.lineJoin = 'round';
+      // peechhe ki aag (tracer)
+      g.fillStyle = lg(g, 0, 28, 0, 42, [[0, 'rgba(255,120,30,.95)'], [0.5, 'rgba(255,50,20,.55)'], [1, 'rgba(255,30,10,0)']]);
+      g.beginPath(); g.moveTo(-5, 28); g.quadraticCurveTo(-6, 38, 0, 42); g.quadraticCurveTo(6, 38, 5, 28); g.closePath(); g.fill();
+      // steel ka khol
+      g.fillStyle = lg(g, -6, 0, 6, 0, [[0, '#2a2e36'], [0.25, '#7d8696'], [0.45, '#e4eaf4'], [0.7, '#6b7484'], [1, '#22262e']]);
+      g.beginPath(); g.moveTo(-5.6, 13); g.lineTo(5.6, 13); g.lineTo(5.6, 30); g.lineTo(-5.6, 30); g.closePath(); g.fill();
+      g.strokeStyle = 'rgba(10,10,16,.85)'; g.lineWidth = 0.9; g.stroke();
+      // laal patti
+      g.fillStyle = '#d4202a'; g.fillRect(-5.6, 22, 11.2, 2.6);
+      // tapta laal nok
+      g.shadowColor = '#ff3a2a'; g.shadowBlur = 7;
+      g.fillStyle = lg(g, -5.6, 0, 5.6, 0, [[0, '#7a0a10'], [0.3, '#e8281e'], [0.5, '#ffb08a'], [0.75, '#d01c1c'], [1, '#600808']]);
+      g.beginPath(); g.moveTo(0, 1); g.bezierCurveTo(4.4, 5, 5.6, 9, 5.6, 14); g.lineTo(-5.6, 14); g.bezierCurveTo(-5.6, 9, -4.4, 5, 0, 1); g.closePath(); g.fill();
+      g.shadowBlur = 0; g.strokeStyle = 'rgba(40,0,0,.8)'; g.lineWidth = 0.8; g.stroke();
+      // chamak
+      g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.ellipse(-1.9, 8, 0.9, 4.5, 0.06, 0, TAU); g.fill();
+      g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(-3.6, 15, 1.2, 12);
     });
   }
     function nukeSpr() {                                           // asli goli (cartridge): taamba ki nok + peetal ka khol
@@ -1119,7 +1133,7 @@
         blit(pickupSpr(p.kind), p.x, p.y, 0.95 + 0.07 * Math.sin(p.age * 6 + p.ph));
       }
       for (i = 0; i < enemies.length; i++) drawEnemy(enemies[i]);
-      for (i = 0; i < eb.length; i++) { b = eb[i]; ctx.globalCompositeOperation = 'lighter'; blit(glowSpr('red'), b.x, b.y, 0.55, 0, 0.6); ctx.globalCompositeOperation = 'source-over'; blit(enemyBulletSpr(), b.x, b.y + 4, 0.8, Math.atan2(b.vx, -b.vy) + PI); }
+      for (i = 0; i < eb.length; i++) { b = eb[i]; ctx.globalCompositeOperation = 'lighter'; blit(glowSpr('red'), b.x, b.y, 0.55, 0, 0.6); ctx.globalCompositeOperation = 'source-over'; blit(enemyBulletSpr(), b.x, b.y + 4, 0.8, Math.atan2(b.vx, -b.vy)); }
       for (i = 0; i < pb.length; i++) {
         b = pb[i];
         if (b.missile) { blit(nukeSpr(), b.x, b.y, 0.5, Math.atan2(b.vx, -b.vy)); }
