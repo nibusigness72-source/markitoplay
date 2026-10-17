@@ -63,7 +63,7 @@
   }
 
   function shareText() {
-    return '🎮 PLAY & WIN me mere saath khelo aur points jeeto! Mera referral code: ' + myCode + '\nJoin karo: ' + myLink;
+    return '🎮 PLAY & WIN  play and earn more point!  referral code: ' + myCode + '\nJoin karo: ' + myLink;
   }
 
   // ---------- Share sheet (WhatsApp, Facebook, Telegram, X, SMS, Email, More, Copy) ----------
