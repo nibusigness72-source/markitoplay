@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Color Flow</title>
+<link rel="stylesheet" href="color-flow.css">
+</head>
+<body>
+<div id="app">
+  <header id="hud">
+    <div class="box score"><small>SCORE</small><b id="score">0</b></div>
+    <div class="box timer"><small>TIME</small><b id="time">60</b><small id="modeName"></small><i id="bar"></i></div>
+    <div class="box level"><small>LEVEL</small><b id="level">1</b></div>
+  </header>
+
+  <main id="stage">
+    <canvas id="board"></canvas>
+    <div id="overlay">
+      <h1>Color Flow</h1>
+      <p id="msg"></p>
+      <button id="startBtn">Start Game</button>
+    </div>
+  </main>
+
+  <footer id="foot">
+    <button id="skipBtn" type="button">Skip ⏭</button>
+  </footer>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="score.js"></script>
+<script src="color-flow-sound.js"></script>
+<script src="color-flow.js"></script>
+</body>
+</html>
