@@ -25,6 +25,7 @@
     'snake-game' : {name:'Snake Game',icon:'🐍',bg:' #0ea5e9'},
    'traffic-racer': { name: 'Traffic Racer', icon: '🏎️', bg: '#ea580c' },
    'space-shooter': { name: 'Space Shooter', icon: '🚀', bg: '#1d4ed8' },
+   'attack':   { name: 'Ball hunt',        icon: '⚔️', bg: '#dc2626' },
 
   };
   var REF = { name: 'Referral Reward', icon: '👥', bg: '#0e7490' };

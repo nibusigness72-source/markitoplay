@@ -1,0 +1,28 @@
+/* attack.css — Ball Hunt ka design (rang, size, buttons) */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#17140f;color:#fff;font-family:"Trebuchet MS","Segoe UI",system-ui,sans-serif;transition:background .6s}
+#app{height:100dvh;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding:env(safe-area-inset-top) 8px env(safe-area-inset-bottom)}
+
+/* upar ke alag-alag box */
+#hud{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:8px 0}
+.box{position:relative;overflow:hidden;border-radius:12px;padding:6px 4px 8px;text-align:center;border:2px solid #000;box-shadow:0 3px 0 #000}
+.box small{display:block;font-size:10px;letter-spacing:.06em;opacity:.85;white-space:nowrap}
+.box b{display:block;font-size:26px;line-height:1.1}
+.box.score{background:#ff5f57;color:#2b0705}
+.box.timer{background:#1f1b14;color:#fff}
+.box.timer b{font-size:32px}
+.box.timer.low b{color:#ff5f57}
+#bar{position:absolute;left:0;bottom:0;height:4px;width:100%;background:#7cc940;transition:width .2s linear}
+
+/* game ka board */
+#stage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}
+canvas{height:100%;max-width:100%;aspect-ratio:9/16;border-radius:16px;touch-action:none;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+
+/* start / game over screen */
+#overlay{position:absolute;inset:0;margin:auto;height:100%;aspect-ratio:9/16;max-width:100%;border-radius:16px;background:rgba(15,12,8,.84);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;padding:24px}
+#overlay.hide{display:none}
+#overlay h1{font-size:46px;color:#ffd23f;text-shadow:3px 3px 0 #000}
+#overlay p{line-height:1.7;font-size:16px}
+
+button{font:inherit;font-weight:700;border:3px solid #000;border-radius:12px;padding:10px 22px;background:#7cc940;color:#000;box-shadow:0 4px 0 #000}
+button:active{transform:translateY(3px);box-shadow:0 1px 0 #000}
