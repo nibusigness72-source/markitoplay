@@ -166,7 +166,7 @@
             base.child('history').push({ type: 'game', game: game, points: pts, time: firebase.database.ServerValue.TIMESTAMP })
               .catch(function (e) { console.warn('history likhna fail', e); });
           }
-          toast(true, '✅ ' + game + ': +' + pts + ' point save hue (aaj ' + out.day + ')');
+          
           return out;
         });
       });
