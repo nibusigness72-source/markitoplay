@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Silent killer - PLAY&amp;WIN</title>
+  <link rel="stylesheet" href="silent-killer.css">
+</head>
+<body>
+
+  <div id="wrap">
+    <canvas id="game"></canvas>
+    <a href="play.html" class="back">←</a>
+
+    <!-- Start screen -->
+    <div class="overlay" id="menu">
+      <div class="card">
+        <h2>🔨 Silent killer</h2>
+        <p>
+          👆 Zameen par <b>tap</b> karo = hero wahan khud chalega (ungli ghisao to saath chalega)<br>
+          🎯 Guard par tap karo = hero use dhoondh kar hathode se maarega<br>
+          🔨 Ek hathoda = guard <b>blast</b> (+3 points)<br>
+          🔦 Torch ki roshni mein aaye to guard goli chalayega (3-4 goli = tum out)<br>
+          🛡️ Shield wale ko <b>peeche se</b> maaro, aage se hathoda atak jayega<br>
+          🔊 Kill ki awaaz door tak jaati hai, dusre guard aa jayenge<br>
+          💰 Cash, 💊 medkit, ❄️ freeze lo<br>
+          🏁 Round: 8 guard → 10 guard → 5 guard, phir se
+        </p>
+        <button class="gold-btn" id="startBtn">Start Game</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="overlay hidden" id="over">
+      <div class="card">
+        <h2>⏱️ Game Over!</h2>
+        <div class="big" id="finalScore">0</div>
+        <p id="finalStats"></p>
+        <p class="note" id="finalNote"></p>
+        <button class="gold-btn" id="againBtn">Play Again</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="free-mode.js"></script>
+  <script src="score.js"></script>
+  <script src="silent-sound.js"></script>
+  <script src="silent-killer.js"></script>
+</body>
+</html>
