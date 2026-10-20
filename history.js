@@ -27,6 +27,8 @@
    'space-shooter': { name: 'Space Shooter', icon: '🚀', bg: '#1d4ed8' },
    'attack':   { name: 'Ball hunt',        icon: '⚔️', bg: '#dc2626' },      'color-flow':   { name: 'Color Flow',   icon: '🌈', bg: '#db2777' },
     'silent-killer': { name: 'Silent Killer', icon: '🔨', bg: '#111827' },
+   'knock-stack':  { name: 'Knock Stack', icon: '🪩', bg: '#ffd24a' },
+
 
   };
   var REF = { name: 'Referral Reward', icon: '👥', bg: '#0e7490' };

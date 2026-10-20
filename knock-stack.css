@@ -1,0 +1,21 @@
+/* knock-stack.css - Knock Stack ka design */
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; -webkit-tap-highlight-color: transparent; }
+html, body { width: 100%; height: 100%; background: #bfeaff; overflow: hidden; overscroll-behavior: none; color: #fff;
+  -webkit-user-select: none; user-select: none; touch-action: none; }
+
+#wrap { position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; background: #bfeaff; }
+#wrap canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+
+.back { position: absolute; top: 10px; left: 10px; width: 34px; height: 34px; border-radius: 50%; background: rgba(0,0,0,.35); color: #fff;
+  text-decoration: none; font-size: 20px; display: flex; align-items: center; justify-content: center; z-index: 5; }
+
+.overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(20,30,60,.55); display: flex; align-items: center; justify-content: center; padding: 14px; z-index: 10; }
+.overlay.hidden { display: none; }
+.card { width: 100%; max-width: 380px; max-height: 96%; overflow: auto; text-align: center; background: #1b2142; border: 2px solid #ffd24a; border-radius: 18px; padding: 16px 18px; }
+.card h2 { font-size: 26px; margin-bottom: 8px; }
+.card p { color: #d3d9f3; font-size: 13px; line-height: 1.7; margin-bottom: 12px; text-align: left; }
+.card p#finalStats, .card p.note { text-align: center; }
+.card .big { font-size: 48px; font-weight: bold; color: #ffd24a; margin-bottom: 4px; }
+.card .note { font-size: 12px; color: #9aa3c8; }
+.gold-btn { width: 100%; background: #ffd24a; color: #222; border: none; border-radius: 12px; padding: 12px; font-size: 16px; font-weight: 800; cursor: pointer; }
+.back-link { display: block; margin-top: 10px; color: #9aa3c8; text-decoration: none; font-size: 14px; }

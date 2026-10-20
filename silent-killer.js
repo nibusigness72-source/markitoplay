@@ -9,7 +9,7 @@
     // ===== TIME, POINTS =====
     GAME_TIME: 240,          // pura game kitne second ka (300 = 5 min). Badhao = zyada der khelna
     SAVE_CAP: 1000,          // ek game mein zyada se zyada itna score save hoga
-    KILL_POINTS: 12,          // ek guard marne par points
+    KILL_POINTS: 13.5,          // ek guard marne par points
     CASH_POINTS: 1,          // cash uthane par points
     ROUND_BONUS: 25,         // round poora hone par bonus points
     RESPAWN_WAIT: 3,         // hero marne ke baad kitne second ruk kar wapas aayega

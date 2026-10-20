@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Knock Stack - PLAY&amp;WIN</title>
+  <link rel="stylesheet" href="knock-stack.css">
+</head>
+<body>
+
+  <div id="wrap">
+    <canvas id="game"></canvas>
+    <a href="play.html" class="back">←</a>
+
+    <!-- Start screen -->
+    <div class="overlay" id="menu">
+      <div class="card">
+        <h2>🏀 Knock Stack</h2>
+        <p>
+          👆 Ungli <b>screen par rakho</b> = ball niche aakar sab tod-ta jayega<br>
+          ✋ Ungli <b>hata do</b> = ball ruk jayega, upar-niche uchhalta rahega<br>
+          ⚫ <b>Kaala</b> hissa nahi tootega, usse takraye to game over<br>
+          🔥 Lagatar ring todo = meter bharega, phir <b>aag wali ball</b> kaala bhi tod degi<br>
+          ⏱️ Sirf <b>1 minute</b> ka time! Ek ring = <b>1 point</b><br>
+          🏁 Sab ring tod do = agla level, naya rang (level ke saath game hard hota jata hai)<br>
+          🎯 1 minute mein jitne zyada level aur ring tod sako utna accha
+        </p>
+        <button class="gold-btn" id="startBtn">Start Game</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="overlay hidden" id="over">
+      <div class="card">
+        <h2 id="overTitle">💥 Game Over!</h2>
+        <div class="big" id="finalScore">0</div>
+        <p id="finalStats"></p>
+        <p class="note" id="finalNote"></p>
+        <button class="gold-btn" id="againBtn">Play Again</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="free-mode.js"></script>
+  <script src="score.js"></script>
+  <script src="knock-sound.js"></script>
+  <script src="knock-stack.js"></script>
+</body>
+</html>
