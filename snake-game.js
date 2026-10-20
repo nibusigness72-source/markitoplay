@@ -502,7 +502,7 @@ function makeCoinSprite() {
   x.beginPath(); x.arc(32, 32, 28, 0, 6.283); x.fillStyle = '#ffc928'; x.fill();
   x.lineWidth = 5; x.strokeStyle = '#e19a00'; x.stroke();
   x.font = '34px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-  x.fillText('😎', 32, 34);
+  x.fillText('🪙', 32, 34);
   coinSpr = c;
 }
 
