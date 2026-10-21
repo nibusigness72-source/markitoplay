@@ -30,7 +30,7 @@
     RINGS_BASE: 40,         // pehle level mein kitni ring
     RINGS_PER_LEVEL: 2,     // har level mein kitni ring badhe
     RINGS_MAX: 50,          // ring ki sabse zyada sankhya
-    LEVEL_BONUS: 20,         // level jeetne par extra points (0 = koi nahi, sirf ring ke points)
+    LEVEL_BONUS: 5,         // level jeetne par extra points (0 = koi nahi, sirf ring ke points)
 
     // ---- ball ----
     GRAVITY: 520,           // ball kitni tez neeche aaye (uchhalte waqt)
