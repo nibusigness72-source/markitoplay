@@ -29,6 +29,7 @@
     'silent-killer': { name: 'Silent Killer', icon: '🔨', bg: '#111827' },
    'knock-stack':  { name: 'Knock Stack', icon: '🪩', bg: '#ffd24a' },
   'match-ball':   { name: 'Match Ball', icon: '🎱', bg: '#7c3aed' },
+   'fruit-merge': { name: 'Fruit Merge', icon: '🍊', bg: '#f2453a' },
 
 
   };

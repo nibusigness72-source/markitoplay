@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Fruit Merge</title>
+<link rel="stylesheet" href="fruit-merge.css">
+</head>
+<body>
+<div id="app">
+
+  <div class="topbar">
+    <a class="round-btn" id="backBtn" href="play.html">&#8249;</a>
+    <div class="stat"><span class="label">SCORE</span><span id="score">0</span></div>
+    <div class="stat"><span class="label">TIME</span><span id="time">60</span></div>
+    <div class="stat"><span class="label">BEST</span><span id="best">0</span></div>
+    <button class="round-btn" id="soundBtn" type="button">&#128266;</button>
+  </div>
+
+  <div class="tools">
+    <button class="tool" id="broomBtn" type="button">&#129529;<span class="badge" id="broomCount">1</span></button>
+    <button class="tool" id="undoBtn" type="button">&#8617;<span class="badge" id="undoCount">1</span></button>
+    <div class="next-box"><span class="next-label">NEXT</span><canvas id="nextCanvas"></canvas></div>
+  </div>
+
+  <div class="board-wrap" id="boardWrap">
+    <div class="frame">
+      <canvas id="game"></canvas>
+      <div id="warn" class="warn hidden"><small>FULL!</small><b id="warnNum">5</b></div>
+    </div>
+  </div>
+
+  <div class="chain" id="chain"></div>
+
+  <div class="overlay" id="overlay">
+    <div class="card">
+      <h1 id="ovTitle">Fruit Merge</h1>
+      <p id="ovText">Same fruits ko merge karo, bada fruit banao!<br>Time: 60 second</p>
+      <div class="result hidden" id="ovResult">Score: <b id="ovScore">0</b> &nbsp;|&nbsp; Best: <b id="ovBest">0</b></div>
+      <button class="big-btn" id="playBtn" type="button">&#9654; PLAY</button>
+      <a class="link-btn" href="play.html">Back</a>
+    </div>
+  </div>
+
+</div>
+
+<!-- Agar stack-tower.html mein firebase-config.js / score.js ki script lines hain to wahi lines yahan (fruit-merge.js se pehle) copy kar do -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+
+  
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="free-mode.js"></script>
+  <script src="score.js"></script>
+<script src="fruit-merge-sound.js"></script>
+<script src="fruit-merge.js"></script>
+</body>
+</html>
