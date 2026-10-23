@@ -15,7 +15,7 @@
     DROP_WEIGHTS: [38, 28, 18, 10, 6], // girne ka chance: chhota zyada, bada kam
     SIZE_SCALE: 1,             // sab fruits ka size ek saath (1.2 = 20% bada, 0.8 = chhota)
     RADII: [14, 18, 23, 28, 34, 41, 49, 58, 68, 80, 94], // har fruit ka alag size
-    POINTS: [3, 5, 8, 12, 16, 24, 32, 40, 44, 32, 32],     // merge point (fruit ke level ke hisab se)
+    POINTS: [3, 5, 8, 12, 14, 20, 26, 40, 44, 32, 32],     // merge point (fruit ke level ke hisab se)
     GRAVITY: 1.8,              // girne ki speed
     BOUNCE: 0.25,              // uchhalna
     FRICTION: 0.08,               // fruit-fruit takraane par rokne ki taqat (zyada = kam phisalna)
