@@ -28,6 +28,7 @@
    'attack':   { name: 'Ball hunt',        icon: '⚔️', bg: '#dc2626' },      'color-flow':   { name: 'Color Flow',   icon: '🌈', bg: '#db2777' },
     'silent-killer': { name: 'Silent Killer', icon: '🔨', bg: '#111827' },
    'knock-stack':  { name: 'Knock Stack', icon: '🪩', bg: '#ffd24a' },
+  'match-ball':   { name: 'Match Ball', icon: '🎱', bg: '#7c3aed' },
 
 
   };

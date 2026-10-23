@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Match Ball - PLAY&amp;WIN</title>
+  <link rel="stylesheet" href="match-ball.css">
+</head>
+<body>
+
+  <div id="wrap">
+    <div class="bg" id="bgA"></div>
+    <div class="bg" id="bgB"></div>
+
+    <!-- upar ki patti -->
+    <div class="topbar">
+      <a href="play.html" class="rbtn" id="homeBtn">🏠</a>
+      <button class="rbtn" id="helpBtn">?</button>
+      <div class="lvl" id="lvlTxt">Level 1</div>
+      <button class="rbtn" id="resetBtn">↻</button>
+    </div>
+    <div class="stats">
+      <span class="chip" id="timeTxt">⏱ 1:00</span>
+      <span class="chip" id="scoreTxt">⭐ 0</span>
+    </div>
+
+    <div id="stage"></div>
+    <div id="pop"></div>
+    <button class="skip" id="skipBtn">Skip Level ⏭</button>
+
+    <!-- Start screen -->
+    <div class="overlay" id="menu">
+      <div class="card">
+        <h2>🎱 Match Ball</h2>
+        <p>
+          👆 Box par tap karo = uski upar wali ball <b>upar uthegi</b><br>
+          👆 Phir dusre box par tap karo = ball usme <b>chali jayegi</b> (koi bhi rang kisi bhi box mein ja sakta hai)<br>
+          ✅ Ek rang ki ball se box <b>poora bhar do</b> (koi jagah khali na bache) = box full, <b>+5 points</b><br>
+          📦 Kabhi-kabhi <b>chhote box</b> bhi aate hain, wo bhi poore bharne par full hote hain<br>
+          ⚪ Har ball kisi box mein daalne par <b>+3 points</b><br>
+          ⏱️ Sirf <b>1 minute</b> ka time, jitne zyada level karo utna accha<br>
+          ⏭ Atak gaye to neeche <b>Skip Level</b> dabao
+        </p>
+        <button class="gold-btn" id="startBtn">Start Game</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+
+    <!-- Help (? button) -->
+    <div class="overlay hidden" id="help">
+      <div class="card">
+        <h2>❓ Kaise khelein</h2>
+        <p>
+          👆 Box par tap = ball upar. Dusre box par tap = ball wahan.<br>
+          ✅ Ek rang se box poora bhar do = <b>+5</b><br>
+          ⚪ Har ball daalne par <b>+3</b><br>
+          Time ruka hua hai, wapas jaakar khelo.
+        </p>
+        <button class="gold-btn" id="helpOk">Wapas khelo</button>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="overlay hidden" id="over">
+      <div class="card">
+        <h2 id="overTitle">⏱️ Time Up!</h2>
+        <div class="big" id="finalScore">0</div>
+        <p id="finalStats"></p>
+        <p class="note" id="finalNote"></p>
+        <button class="gold-btn" id="againBtn">Play Again</button>
+        <a href="play.html" class="back-link">Wapas jao</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="free-mode.js"></script>
+  <script src="score.js"></script>
+  <script src="match-sound.js"></script>
+  <script src="match-ball.js"></script>
+</body>
+</html>
