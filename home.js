@@ -17,7 +17,7 @@ var DEFAULT_PHOTO = 'data:image/svg+xml;utf8,' + encodeURIComponent(
 avatarEl.src = DEFAULT_PHOTO;
 
 function randomId() {
-  return String(Math.floor(100000 + Math.random() * 900000));
+  return String(Math.floor(1000000000 + Math.random() * 9000000000));
 }
 
 firebase.auth().onAuthStateChanged(function (user) {
