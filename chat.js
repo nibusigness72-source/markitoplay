@@ -109,13 +109,18 @@ function userCard(p) {
 }
 
 /* ---------- Recent (sirf is phone mein save) ---------- */
+function recentKey() { return 'chatRecent_' + (me ? me.uid : 'x'); }
 function getRecent() {
-  try { return JSON.parse(localStorage.getItem('chatRecent') || '[]'); } catch (e) { return []; }
+  try {
+    var list = JSON.parse(localStorage.getItem(recentKey()) || '[]');
+    // apna khud ka card kabhi nahi dikhana
+    return list.filter(function (x) { return me && x.uid !== me.uid && x.pid !== me.pid; });
+  } catch (e) { return []; }
 }
 function saveRecent(p) {
   var list = getRecent().filter(function (x) { return x.pid !== p.pid; });
   list.unshift({ uid: p.uid, pid: p.pid, name: p.name, photo: p.photo });
-  try { localStorage.setItem('chatRecent', JSON.stringify(list.slice(0, 10))); } catch (e) {}
+  try { localStorage.setItem(recentKey(), JSON.stringify(list.slice(0, 10))); } catch (e) {}
 }
 function renderRecent() {
   var box = $('recentBox');
@@ -127,6 +132,10 @@ function renderRecent() {
 
 /* ---------- Chat window ---------- */
 function openChat(p) {
+  if (!me || p.uid === me.uid) {
+    showMsg('Apne aap se chat nahi ho sakti', true);
+    return;
+  }
   peer = p;
   saveRecent(p);
   seen = {};
