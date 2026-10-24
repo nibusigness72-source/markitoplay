@@ -216,20 +216,20 @@ function gate(cb) {
   }).catch(function () { showMsg('Chat lock check nahi hua. Database Rules check karo.', true); });
 }
 $('lkName').addEventListener('input', function () { this.value = this.value.toLowerCase().replace(/[^a-z0-9_]/g, ''); checkName(); });
-$('lkPass').addEventListener('input', function () { $('pwCount').textContent = charCount(this.value) + '/38'; });
+$('lkPass').addEventListener('input', function () { $('pwCount').textContent = charCount(this.value) + '/8'; });
 $('lkEye').addEventListener('click', function () { var p = $('lkPass'); p.type = p.type === 'password' ? 'text' : 'password'; });
 $('lkGen').addEventListener('click', function () {
-  var pw = genPass(), p = $('lkPass'); p.value = pw; p.type = 'text'; $('pwCount').textContent = '38/38';
+  var pw = genPass(), p = $('lkPass'); p.value = pw; p.type = 'text'; $('pwCount').textContent = '8/8';
   try { navigator.clipboard.writeText(pw); } catch (e) {}
   lkMsg('Ye password copy ho gaya. Kahin surakshit likh lo, dobara nahi dikhega.');
 });
 $('lkReset').addEventListener('click', function () {
   lockUI('reset');
-  lkMsg('Aap apne account se login ho, isliye naya 38 akshar ka password bana sakte ho.');
+  lkMsg('Aap apne account se login ho, isliye naya 8 akshar ka password bana sakte ho.');
 });
 $('lkGo').addEventListener('click', function () {
   var pw = $('lkPass').value;
-  if (charCount(pw) !== 38) { lkMsg('Password theek 38 akshar ka hona chahiye (abhi ' + charCount(pw) + ')', true); return; }
+  if (charCount(pw) !== 38) { lkMsg('Password theek 8 akshar ka hona chahiye (abhi ' + charCount(pw) + ')', true); return; }
   var fail = function (e) { lkMsg(e && e.message === 'secure' ? 'Secure (https) connection chahiye' : 'Nahi hua, dobara try karo', true); };
   lkMsg('Ruko...');
   if (lockMode === 'unlock') {
