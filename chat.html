@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat</title>
+  <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+
+  <!-- VIEW 1: Search -->
+  <div class="app" id="searchView">
+    <header class="header">
+      <a href="settings.html" class="back-btn">←</a>
+      <h1>Chat</h1>
+    </header>
+
+    <form class="search-box" id="searchForm">
+      <input type="text" id="uidInput" inputmode="numeric" maxlength="12" placeholder="Player ID (UID) likho" autocomplete="off">
+      <button type="submit">🔍</button>
+    </form>
+    <p class="hint" id="searchMsg"></p>
+
+    <div id="resultBox"></div>
+
+    <h2 class="sub-title" id="recentTitle" style="display:none">Recent</h2>
+    <div id="recentBox"></div>
+  </div>
+
+  <!-- VIEW 2: Chat window -->
+  <div class="chat-view" id="chatView" style="display:none">
+    <header class="chat-head">
+      <button class="back-btn" id="chatBack">←</button>
+      <div class="avatar" id="peerAvatar">🧑</div>
+      <div class="peer-info">
+        <span class="peer-name" id="peerName">Player</span>
+        <span class="peer-id" id="peerId"></span>
+      </div>
+    </header>
+
+    <div class="messages" id="messages"></div>
+
+    <div class="emoji-panel" id="emojiPanel" style="display:none"></div>
+
+    <div class="input-bar">
+      <button class="icon-btn" id="emojiBtn">😊</button>
+      <div class="input-wrap">
+        <input type="text" id="msgInput" placeholder="Type a message..." autocomplete="off">
+        <span class="counter" id="counter">0/50</span>
+      </div>
+      <label class="icon-btn cam" for="photoPick">📷</label>
+      <input type="file" id="photoPick" accept="image/*" hidden>
+      <button class="send-btn" id="sendBtn">➤</button>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="chat.js"></script>
+</body>
+</html>
