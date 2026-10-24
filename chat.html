@@ -8,6 +8,37 @@
 </head>
 <body>
 
+  <!-- VIEW 0: Chat Lock (Username + Password) -->
+  <div class="lock" id="lockView" style="display:none">
+    <div class="lock-head">
+      <div class="lock-logo">🛡️</div>
+      <div><h1>MARKITO</h1><p>Secure • Ephemeral • Private</p></div>
+      <div class="pp">🔒 Your Privacy<br>Our Priority</div>
+    </div>
+    <div class="lock-card">
+      <div id="lkWho" style="display:none"></div>
+      <div id="nameBlock">
+        <h3>👤 Username</h3>
+        <input type="text" id="lkName" maxlength="16" placeholder="Username (a-z, 0-9, _)" autocomplete="off" autocapitalize="none">
+        <div class="bad" id="nameErr"></div>
+        <h4 class="sug-t">💡 Suggested Usernames</h4>
+        <div id="sugList"></div>
+      </div>
+      <h3 id="pwLabel" style="margin-top:16px">🔒 Password</h3>
+      <div class="pw-row">
+        <input type="password" id="lkPass" maxlength="38" placeholder="Enter password" autocomplete="off">
+        <button type="button" id="lkEye">👁</button>
+      </div>
+      <div class="pw-meta"><span class="cnt" id="pwCount">0/38</span> Password must be exactly 38 characters <button type="button" id="lkGen">🎲 Banao</button></div>
+      <p class="hint" id="lkMsg"></p>
+      <button class="lk-btn" id="lkGo">Continue</button>
+      <div class="forgot" id="forgotBox" style="display:none">
+        <div><b>Forgot Password</b>Click to reset your password if you ever forget it.</div>
+        <button type="button" id="lkReset">Reset Now ›</button>
+      </div>
+    </div>
+  </div>
+
   <!-- VIEW 1: Search -->
   <div class="app" id="searchView">
     <header class="header">
@@ -17,7 +48,7 @@
     </header>
 
     <form class="search-box" id="searchForm">
-      <input type="text" id="uidInput" inputmode="numeric" maxlength="12" placeholder="Player ID (UID) likho" autocomplete="off">
+      <input type="text" id="uidInput" maxlength="16" placeholder="Player ID ya Username likho" autocomplete="off">
       <button type="submit">🔍</button>
     </form>
     <p class="hint" id="searchMsg"></p>

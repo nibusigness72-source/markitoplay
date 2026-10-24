@@ -110,3 +110,30 @@ body { background:linear-gradient(180deg,#060c24,#0a1233); color:var(--text); mi
 .emoji-tabs button.on { border-bottom-color:var(--cyan); }
 .emoji-grid { display:flex; flex-wrap:wrap; gap:2px; padding:6px; max-height:190px; overflow-y:auto; }
 .emoji-grid span { font-size:26px; padding:4px; cursor:pointer; }
+
+
+/* ===== Chat Lock (MARKITO) ===== */
+.lock{position:fixed;left:0;top:0;right:0;bottom:0;z-index:50;overflow:auto;background:radial-gradient(circle at 50% 0,#0b2257,#050a1c 60%);padding:18px 14px 40px}
+.lock-head{display:flex;align-items:center;gap:12px;max-width:480px;margin:0 auto 14px}
+.lock-logo{font-size:44px;filter:drop-shadow(0 0 10px #22d3ee)}
+.lock-head h1{font-size:30px;letter-spacing:2px;background:linear-gradient(90deg,#fff,#22d3ee,#a855f7);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lock-head p{font-size:12px;color:#7dd3fc}
+.lock-head .pp{margin-left:auto;font-size:11px;color:#9fb0d9;text-align:right}
+.lock-card{max-width:480px;margin:0 auto;border:1px solid #1d4ed8;border-radius:20px;padding:16px;background:rgba(5,12,34,.85);box-shadow:0 0 24px rgba(34,211,238,.15)}
+.lock-card h3{font-size:17px;margin:4px 0 8px}
+.lock-card input{width:100%;border:2px solid transparent;border-radius:14px;padding:13px;font-size:16px;color:#fff;outline:0;background-image:linear-gradient(#050a1c,#050a1c),linear-gradient(90deg,#22d3ee,#a855f7);background-origin:border-box;background-clip:padding-box,border-box}
+.bad{display:none;margin-top:8px;background:rgba(239,68,68,.12);border:1px solid #ef4444;border-radius:12px;padding:8px 12px;font-size:13px;color:#fff}
+.bad b{display:block;color:#f87171}
+.sug-t{font-size:15px;margin:14px 0 8px}
+#sugList{display:flex;flex-wrap:wrap;gap:8px}
+.sug{background:#0b1740;border:1px solid #3b5bdb;border-radius:14px;padding:9px 12px;color:#fff;font-size:14px}
+.pw-row{position:relative}
+.pw-row button{position:absolute;right:8px;top:8px;background:none;border:none;font-size:20px;color:#fff}
+.pw-meta{display:flex;align-items:center;gap:8px;margin:10px 0;font-size:13px;color:#9fb0d9;flex-wrap:wrap}
+.pw-meta .cnt{background:#312e81;color:#fff;border-radius:14px;padding:3px 10px;font-weight:700}
+.pw-meta button{margin-left:auto;background:#0b1740;border:1px solid #3b5bdb;border-radius:10px;color:#fff;padding:5px 9px}
+.lk-btn{width:100%;margin-top:6px;padding:14px;border:none;border-radius:14px;background:linear-gradient(90deg,#2563eb,#7c3aed);color:#fff;font-size:16px;font-weight:700}
+.forgot{display:flex;align-items:center;gap:10px;margin-top:16px;border:1px solid #3b5bdb;border-radius:14px;padding:12px;font-size:13px;color:#cbd5e1}
+.forgot b{display:block;font-size:16px;color:#fff}
+.forgot button{margin-left:auto;background:none;border:none;color:#38bdf8;font-weight:700;white-space:nowrap}
+#lkWho{font-size:18px;font-weight:700;margin:6px 0 12px}

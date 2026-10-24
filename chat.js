@@ -116,13 +116,15 @@ firebase.auth().onAuthStateChanged(function (user) {
     // Apna public card (dusre UID se dhundh sakein)
     db.ref('playerIds/' + me.pid).set({ uid: me.uid, n: me.name, p: me.photo });
 
-    startInbox();
+    gate(function () {      // pehle Username + Password wala lock
+      startInbox();
 
-    // Notification par click karke aaye ho to seedha chat kholo: chat.html?pid=...
-    var qp = new URLSearchParams(location.search).get('pid');
-    if (qp && /^[0-9]{10,12}$/.test(qp)) {
-      findUser(qp, function (p) { openChat(p); }, function (m) { showMsg(m, true); });
-    }
+      // Notification par click karke aaye ho to seedha chat kholo: chat.html?pid=...
+      var qp = new URLSearchParams(location.search).get('pid');
+      if (qp && /^[0-9]{10,12}$/.test(qp)) {
+        findUser(qp, function (p) { openChat(p); }, function (m) { showMsg(m, true); });
+      }
+    });
   }).catch(function () {
     showMsg('Data nahi aaya. Database Rules check karo.', true);
   });
@@ -139,28 +141,152 @@ function findUser(pid, ok, fail) {
   }).catch(function () { fail('Search nahi hua, dobara try karo'); });
 }
 
-$('uidInput').addEventListener('input', function () {
-  this.value = this.value.replace(/\D/g, '');
+/* ---------- Chat Lock: Username + Password (theek 38 akshar) ---------- */
+var lockCb = null, lockMode = 'create', lockAuth = null, nameOk = false, nameTimer = null;
+
+function rhex(n) { var a = new Uint8Array(n), s = ''; crypto.getRandomValues(a); for (var i = 0; i < n; i++) s += ('0' + a[i].toString(16)).slice(-2); return s; }
+function sha(str) {
+  if (!(window.crypto && crypto.subtle && window.TextEncoder)) return Promise.reject(new Error('secure'));
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function (b) {
+    return Array.prototype.map.call(new Uint8Array(b), function (x) { return ('0' + x.toString(16)).slice(-2); }).join('');
+  });
+}
+function lkMsg(t, err) { var e = $('lkMsg'); e.textContent = t || ''; e.className = 'hint' + (err ? ' err' : ''); }
+function genPass() {
+  var ch = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%&*', a = new Uint8Array(8), s = '';
+  crypto.getRandomValues(a);
+  for (var i = 0; i < 8; i++) s += ch.charAt(a[i] % ch.length);
+  return s;
+}
+function nameBad(t) {
+  var e = $('nameErr');
+  if (t) { e.innerHTML = ''; e.appendChild(el('b', '', 'Invalid Username')); e.appendChild(document.createTextNode(t)); e.style.display = 'block'; }
+  else e.style.display = 'none';
+}
+function showSug() {      // sujhaye hue naam: base_247, basekin, base_official
+  var base = ($('lkName').value || me.name).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 9) || 'player';
+  var list = [base + '_' + (10 + Math.floor(Math.random() * 990)), base + 'king', base + '_official'], box = $('sugList');
+  box.innerHTML = '';
+  list.forEach(function (n) {
+    var b = el('button', 'sug', n + '  ⧉'); b.type = 'button';
+    b.addEventListener('click', function () { $('lkName').value = n; checkName(); });
+    box.appendChild(b);
+  });
+}
+function checkName() {
+  var v = $('lkName').value.trim().toLowerCase();
+  nameOk = false; clearTimeout(nameTimer);
+  if (!v) { nameBad(''); return; }
+  if (!/^[a-z0-9_]{3,16}$/.test(v)) { nameBad('Username 3 se 16 akshar ka ho, sirf a-z, 0-9 aur _'); return; }
+  nameTimer = setTimeout(function () {
+    db.ref('chatNames/' + v).once('value').then(function (s) {
+      if ($('lkName').value.trim().toLowerCase() !== v) return;
+      if (s.exists()) { nameBad('This username already exists.'); showSug(); }
+      else { nameBad(''); nameOk = true; }
+    }).catch(function () { nameBad('Check nahi hua, dobara try karo'); });
+  }, 350);
+}
+function lockUI(mode) {
+  lockMode = mode;
+  var create = mode === 'create';
+  $('nameBlock').style.display = create ? '' : 'none';
+  $('lkWho').style.display = create ? 'none' : 'block';
+  if (!create && lockAuth) $('lkWho').textContent = '👤 ' + lockAuth.u;
+  $('pwLabel').textContent = mode === 'reset' ? '🔒 Naya Password' : '🔒 Password';
+  $('lkGo').textContent = create ? 'Chat shuru karo' : (mode === 'reset' ? 'Naya password save karo' : 'Unlock');
+  $('forgotBox').style.display = mode === 'unlock' ? 'flex' : 'none';
+  $('lkGen').style.display = mode === 'unlock' ? 'none' : '';
+  $('lkPass').value = ''; $('pwCount').textContent = '0/8'; lkMsg('');
+}
+function unlocked() {
+  try { sessionStorage.setItem('mk_ok', me.uid); } catch (e) {}
+  me.cname = lockAuth.u;
+  $('lockView').style.display = 'none';
+  if (lockCb) { var f = lockCb; lockCb = null; f(); }
+}
+function gate(cb) {
+  lockCb = cb;
+  db.ref('chatAuth/' + me.uid).once('value').then(function (s) {
+    lockAuth = s.val();
+    var ok = false; try { ok = sessionStorage.getItem('mk_ok') === me.uid; } catch (e) {}
+    if (lockAuth && ok) { me.cname = lockAuth.u; lockCb = null; cb(); return; }
+    $('lockView').style.display = 'block';
+    lockUI(lockAuth ? 'unlock' : 'create');
+    if (!lockAuth) { $('lkName').value = ''; showSug(); }
+  }).catch(function () { showMsg('Chat lock check nahi hua. Database Rules check karo.', true); });
+}
+$('lkName').addEventListener('input', function () { this.value = this.value.toLowerCase().replace(/[^a-z0-9_]/g, ''); checkName(); });
+$('lkPass').addEventListener('input', function () { $('pwCount').textContent = charCount(this.value) + '/38'; });
+$('lkEye').addEventListener('click', function () { var p = $('lkPass'); p.type = p.type === 'password' ? 'text' : 'password'; });
+$('lkGen').addEventListener('click', function () {
+  var pw = genPass(), p = $('lkPass'); p.value = pw; p.type = 'text'; $('pwCount').textContent = '38/38';
+  try { navigator.clipboard.writeText(pw); } catch (e) {}
+  lkMsg('Ye password copy ho gaya. Kahin surakshit likh lo, dobara nahi dikhega.');
 });
+$('lkReset').addEventListener('click', function () {
+  lockUI('reset');
+  lkMsg('Aap apne account se login ho, isliye naya 38 akshar ka password bana sakte ho.');
+});
+$('lkGo').addEventListener('click', function () {
+  var pw = $('lkPass').value;
+  if (charCount(pw) !== 38) { lkMsg('Password theek 38 akshar ka hona chahiye (abhi ' + charCount(pw) + ')', true); return; }
+  var fail = function (e) { lkMsg(e && e.message === 'secure' ? 'Secure (https) connection chahiye' : 'Nahi hua, dobara try karo', true); };
+  lkMsg('Ruko...');
+  if (lockMode === 'unlock') {
+    sha(lockAuth.s + ':' + pw).then(function (h) {
+      if (h !== lockAuth.h) { lkMsg('Password galat hai', true); return; }
+      unlocked();
+    }).catch(fail);
+  } else if (lockMode === 'reset') {
+    if (!confirm('Naya password set karna hai? Purana password band ho jayega.')) { lkMsg(''); return; }
+    var s1 = rhex(12);
+    sha(s1 + ':' + pw).then(function (h) {
+      return db.ref('chatAuth/' + me.uid).set({ h: h, s: s1, u: lockAuth.u }).then(function () { lockAuth = { h: h, s: s1, u: lockAuth.u }; unlocked(); });
+    }).catch(fail);
+  } else {
+    var u = $('lkName').value.trim().toLowerCase();
+    if (!nameOk) { lkMsg('Pehle sahi Username chuno', true); return; }
+    var s2 = rhex(12);
+    sha(s2 + ':' + pw).then(function (h) {
+      var up = {};
+      up['chatNames/' + u] = { uid: me.uid, pid: me.pid };
+      up['chatAuth/' + me.uid] = { h: h, s: s2, u: u };
+      return db.ref().update(up).then(function () { lockAuth = { h: h, s: s2, u: u }; unlocked(); }, function () {
+        nameOk = false; nameBad('This username already exists.'); showSug(); lkMsg('Save nahi hua', true);
+      });
+    }).catch(fail);
+  }
+});
+/* ---------- Search (Player ID ya Username) ---------- */
+$('uidInput').addEventListener('input', function () {
+  this.value = this.value.replace(/[^a-zA-Z0-9_]/g, '');
+});
+
+function showFound(p) {
+  showMsg('');
+  var r = inbox[roomOf(me.uid, p.uid)];
+  if (r && r.nick) p.nick = r.nick;
+  $('resultBox').appendChild(userCard(p));
+}
 
 $('searchForm').addEventListener('submit', function (e) {
   e.preventDefault();
   if (!me) { showMsg('Thoda ruko, loading...', true); return; }
-
-  var pid = $('uidInput').value.trim();
+  var raw = $('uidInput').value.trim();
   $('resultBox').innerHTML = '';
-
-  if (pid.length < 10 || pid.length > 12) {
-    showMsg('UID 10 se 12 digit ka hona chahiye', true);
-    return;
+  if (/^[0-9]{10,12}$/.test(raw)) {                                           // Player ID se
+    showMsg('Dhundh rahe hain...');
+    findUser(raw, showFound, function (m) { showMsg(m, true); });
+  } else if (/^[a-zA-Z0-9_]{3,16}$/.test(raw) && !/^[0-9]+$/.test(raw)) {    // Username se
+    showMsg('Dhundh rahe hain...');
+    db.ref('chatNames/' + raw.toLowerCase()).once('value').then(function (s) {
+      var d = s.val();
+      if (!d) { showMsg('Ye username nahi mila', true); return; }
+      findUser(String(d.pid), showFound, function (m) { showMsg(m, true); });
+    }).catch(function () { showMsg('Search nahi hua, dobara try karo', true); });
+  } else {
+    showMsg('UID (10 se 12 ank) ya Username (3 se 16 akshar) likho', true);
   }
-  showMsg('Dhundh rahe hain...');
-  findUser(pid, function (p) {
-    showMsg('');
-    var r = inbox[roomOf(me.uid, p.uid)];
-    if (r && r.nick) p.nick = r.nick;
-    $('resultBox').appendChild(userCard(p));
-  }, function (m) { showMsg(m, true); });
 });
 
 function userCard(p, opts) {
@@ -237,7 +363,6 @@ function editNick(room, current) {
   var ref = db.ref('userChats/' + me.uid + '/' + room + '/nick');
   (v ? ref.set(v) : ref.remove()).catch(function () { alert('Naam save nahi hua'); });
 }
-
 /* ---------- Chat window ---------- */
 var msgs = {};          // key -> { d, box, ... }
 var hidden = {};        // "Delete for me" wale message
@@ -456,7 +581,6 @@ function closeViewer() {
 }
 $('viewerClose').addEventListener('click', closeViewer);
 $('viewer').addEventListener('contextmenu', function (e) { e.preventDefault(); });
-
 /* ---------- Menu sheet ---------- */
 function closeSheet() { $('sheetBg').style.display = 'none'; }
 $('sheetBg').addEventListener('click', function (e) { if (e.target === this) closeSheet(); });
