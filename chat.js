@@ -257,7 +257,7 @@ $('lkGo').addEventListener('click', function () {
     }).catch(fail);
   }
 });
-/* ---------- Search (Player ID ya Username) ---------- */
+  /* ---------- Search (Player ID ya Username) ---------- */
 $('uidInput').addEventListener('input', function () {
   this.value = this.value.replace(/[^a-zA-Z0-9_]/g, '');
 });
@@ -384,8 +384,7 @@ function openChat(p) {
   roomId = roomOf(me.uid, peer.uid);
   window.activeChatRoom = roomId;
   if (inbox[roomId] && inbox[roomId].nick) peer.nick = inbox[roomId].nick;
-
-  // Meri list mein ye chat jod do + "padh liya" mark karo
+// Meri list mein ye chat jod do + "padh liya" mark karo
   db.ref('userChats/' + me.uid + '/' + roomId).update({
     uid: peer.uid, pid: peer.pid, n: peer.name, p: cleanP(peer.photo), r: TS
   }).catch(function () {});
@@ -445,6 +444,7 @@ function startMessages() {
     if (m.box.parentNode) m.box.parentNode.removeChild(m.box);
     delete msgs[s.key];
     if (viewingKey === s.key) closeViewer();
+    if (window.ChatAdv) window.ChatAdv.onRemoved(s.key, m.d);
     if (hidden[s.key]) hiddenRef.child(s.key).remove().catch(function () {});  // safai
   });
 }
@@ -483,6 +483,9 @@ function buildMessage(key, d) {
     m.wrap.appendChild(el('div', 'tapview', '👁 Tap to view'));
     m.wrap.addEventListener('click', function (e) { e.stopPropagation(); openViewer(key); });
     box.appendChild(m.wrap);
+  } else if (d.type === 'video' || d.type === 'file') {
+    if (!window.ChatAdv) return;
+    window.ChatAdv.buildMedia(key, d, m, box);
   } else {
     m.content = el('span', 'txt');       // textContent = safe
     box.appendChild(m.content);
@@ -544,8 +547,9 @@ function tickAll() {
   var now = nowS();
   Object.keys(msgs).forEach(function (k) {
     var m = msgs[k], d = m.d;
-    if (!d.seenAt || !d.dur) return;
-    var remain = d.seenAt + d.dur - now;
+    var base = (d.mode === 'sent') ? d.t : d.seenAt;
+    if (!base || !d.dur) return;
+    var remain = base + d.dur - now;
     var label = '⏳ ' + Math.max(0, Math.ceil(remain / 1000)) + 's';
     m.timer.textContent = label;
     if (viewingKey === k) $('viewerTimer').textContent = label;
@@ -673,18 +677,23 @@ function sendText() {
   var n = charCount(text);
   if (!text || !msgRef || n > MAX_TEXT) return;
   var dur = calculateReadTimer(n) * 1000;
+  var advMode = null;
+  var advSel = window.ChatAdv ? window.ChatAdv.timerFor() : null;
+  if (advSel) { dur = advSel.dur; advMode = advSel.mode; }
 
   if (editingKey) {
     var key = editingKey;
     cancelEdit();
-    msgRef.child(key).update({ text: text, dur: dur, edited: true })
+    msgRef.child(key).update({ text: text, dur: dur, edited: true, mode: advMode })
       .catch(function () { alert('Edit nahi hua. Shayad samne wale ne dekh liya.'); });
     return;
   }
 
   input.value = '';
   updateCounter();
-  msgRef.push({ from: me.uid, type: 'text', text: text, dur: dur, t: TS })
+  var out = { from: me.uid, type: 'text', text: text, dur: dur, t: TS };
+  if (advMode) out.mode = advMode;
+  msgRef.push(out)
     .then(touchPeer)
     .catch(function () { alert('Message nahi gaya, dobara try karo'); });
 }
@@ -693,8 +702,7 @@ $('sendBtn').addEventListener('click', sendText);
 input.addEventListener('keydown', function (e) {
   if (e.key === 'Enter') { e.preventDefault(); sendText(); }
 });
-
-/* ---------- Emoji picker ---------- */
+  /* ---------- Emoji picker ---------- */
 (function buildEmojiPanel() {
   var panel = $('emojiPanel');
   panel.innerHTML = '';
@@ -773,6 +781,16 @@ $('bellBtn').addEventListener('click', function () {
   Notification.requestPermission().then(bellState);
 });
 bellState();
+
+window.ChatCore = {
+  db: db, TS: TS, nowS: nowS,
+  touchPeer: function () { touchPeer(); },
+  getMe: function () { return me; },
+  getPeer: function () { return peer; },
+  getRoom: function () { return roomId; },
+  getMsgRef: function () { return msgRef; },
+  getMsgs: function () { return msgs; }
+};
 
 })();
 }
