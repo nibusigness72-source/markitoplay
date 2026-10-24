@@ -141,7 +141,7 @@ function findUser(pid, ok, fail) {
   }).catch(function () { fail('Search nahi hua, dobara try karo'); });
 }
 
-/* ---------- Chat Lock: Username + Password (theek 38 akshar) ---------- */
+/* ---------- Chat Lock: Username + Password (theek 8 akshar) ---------- */
 var lockCb = null, lockMode = 'create', lockAuth = null, nameOk = false, nameTimer = null;
 
 function rhex(n) { var a = new Uint8Array(n), s = ''; crypto.getRandomValues(a); for (var i = 0; i < n; i++) s += ('0' + a[i].toString(16)).slice(-2); return s; }
@@ -229,7 +229,7 @@ $('lkReset').addEventListener('click', function () {
 });
 $('lkGo').addEventListener('click', function () {
   var pw = $('lkPass').value;
-  if (charCount(pw) !== 38) { lkMsg('Password theek 8 akshar ka hona chahiye (abhi ' + charCount(pw) + ')', true); return; }
+  if (charCount(pw) !== 8) { lkMsg('Password theek 8 akshar ka hona chahiye (abhi ' + charCount(pw) + ')', true); return; }
   var fail = function (e) { lkMsg(e && e.message === 'secure' ? 'Secure (https) connection chahiye' : 'Nahi hua, dobara try karo', true); };
   lkMsg('Ruko...');
   if (lockMode === 'unlock') {
