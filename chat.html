@@ -13,6 +13,7 @@
     <header class="header">
       <a href="settings.html" class="back-btn">←</a>
       <h1>Chat</h1>
+      <button class="bell" id="bellBtn">🔔</button>
     </header>
 
     <form class="search-box" id="searchForm">
@@ -23,7 +24,7 @@
 
     <div id="resultBox"></div>
 
-    <h2 class="sub-title" id="recentTitle" style="display:none">Recent</h2>
+    <h2 class="sub-title" id="recentTitle" style="display:none">Chats</h2>
     <div id="recentBox"></div>
   </div>
 
@@ -33,7 +34,10 @@
       <button class="back-btn" id="chatBack">←</button>
       <div class="avatar" id="peerAvatar">🧑</div>
       <div class="peer-info">
-        <span class="peer-name" id="peerName">Player</span>
+        <div class="name-row">
+          <span class="peer-name" id="peerName">Player</span>
+          <button class="nick-btn" id="nickBtn" title="Naam badlo">✏️</button>
+        </div>
         <span class="peer-id" id="peerId"></span>
       </div>
     </header>
@@ -41,6 +45,11 @@
     <div class="messages" id="messages"></div>
 
     <div class="emoji-panel" id="emojiPanel" style="display:none"></div>
+
+    <div class="edit-bar" id="editBar" style="display:none">
+      <span>✏️ Message edit ho raha hai</span>
+      <button id="editCancel">✖</button>
+    </div>
 
     <div class="input-bar">
       <button class="icon-btn" id="emojiBtn">😊</button>
@@ -53,6 +62,18 @@
       <button class="send-btn" id="sendBtn">➤</button>
     </div>
   </div>
+
+  <!-- Photo full screen -->
+  <div class="viewer" id="viewer" style="display:none">
+    <div class="viewer-top">
+      <button id="viewerClose">✕</button>
+      <span id="viewerTimer"></span>
+    </div>
+    <img id="viewerImg" draggable="false" alt="">
+  </div>
+
+  <!-- Message menu -->
+  <div class="sheet-bg" id="sheetBg" style="display:none"><div class="sheet" id="sheet"></div></div>
 
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
