@@ -125,13 +125,13 @@
     o.stage.appendChild(v);
     var ms = new MediaSource(), url = URL.createObjectURL(ms), sb = null;
     var dead = false, first = false, want = false, done = false, stalled = false;
-    var got = {}, nextFetch = 0, nextAppend = 0, inflight = 0, AHEAD = o.ahead || 5;
+    var got = {}, nextFetch = 0, nextAppend = 0, inflight = 0, AHEAD = o.ahead || 5, REBUF = 3;
 
     function bufEnd() { try { var b = v.buffered; return b.length ? b.end(b.length - 1) : 0; } catch (e) { return 0; } }
     function fail() { if (!dead && o.onError) o.onError(); }
     function stall(b) { if (stalled === b) return; stalled = b; if (o.onStall) o.onStall(b); }
     function fetchMore() {                       // keep loading chunks in order while watching
-      while (!dead && inflight < 4 && nextFetch < o.n && nextFetch - nextAppend < 24) {
+      while (!dead && inflight < 6 && nextFetch < o.n && nextFetch - nextAppend < 24) {
         (function (j) {
           inflight++;
           o.getChunk(j).then(function (bytes) {
@@ -169,8 +169,17 @@
       sb.addEventListener('error', fail);
       fetchMore();
     });
-    v.onwaiting = function () { if (first && want) stall(true); };
-    v.onplaying = function () { stall(false); };
+    // smooth like WhatsApp: when the data runs out, wait quietly until 3 seconds are ready, then go on (no stop-start jerks)
+    var wd = setInterval(function () {
+      if (dead || !first || !want) return;
+      var ahead = bufEnd() - v.currentTime;
+      if (!stalled) {
+        if (!done && ahead < 0.4 && !v.paused) { v.pause(); stall(true); }
+      } else if (done || ahead >= REBUF) {
+        stall(false);
+        var p = v.play(); if (p && p.catch) p.catch(noop);
+      }
+    }, 250);
     v.onended = function () { if (!dead && o.onEnd) o.onEnd(); };
     v.onerror = fail;
 
@@ -182,7 +191,7 @@
       time: function () { return v.currentTime || 0; },
       dur: function () { return o.dur; },
       destroy: function () {
-        dead = true; v.onended = v.onerror = v.onwaiting = v.onplaying = null;
+        dead = true; clearInterval(wd); v.onended = v.onerror = null;
         try { v.pause(); v.removeAttribute('src'); v.load(); } catch (x) {}
         try { URL.revokeObjectURL(url); } catch (x) {}
         if (v.parentNode) v.parentNode.removeChild(v);
