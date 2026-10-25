@@ -353,6 +353,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+
 <script src="firebase-config.js"></script>
 <script src="script.js"></script>
 <script src="home.js"></script>
@@ -364,7 +366,6 @@
   <script src="free-mode.js"></script>
 
 <!-- Firebase Cloud Messaging (Compat) Scripts -->
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
 
 <script>
   // 1. Service Worker रजिस्टर करें
@@ -372,55 +373,51 @@
     navigator.serviceWorker.register('/firebase-messaging-sw.js')
       .then((registration) => {
         console.log('Service Worker Registered successfully:', registration);
-        requestPermission(registration);
+        
+        // 2. Notification Permission और FCM Token प्राप्त करना
+        Notification.requestPermission().then((permission) => {
+          if (permission === 'granted') {
+            console.log('Notification permission granted.');
+            
+            if (typeof firebase !== 'undefined' && firebase.messaging) {
+              const messaging = firebase.messaging();
+              messaging.getToken({ serviceWorkerRegistration: registration })
+                .then((currentToken) => {
+                  if (currentToken) {
+                    console.log('FCM Device Token:', currentToken);
+                  } else {
+                    console.log('No registration token available.');
+                  }
+                })
+                .catch((err) => {
+                  console.error('Token error: ', err);
+                });
+            }
+          } else {
+            console.log('Permission denied.');
+          }
+        });
+
       })
       .catch((err) => {
         console.error('Service Worker registration failed:', err);
       });
   }
 
-  // 2. Notification Permission और FCM Token प्राप्त करना
-  function requestPermission(swRegistration) {
-    Notification.requestPermission().then((permission) => {
-      if (permission === 'granted') {
-        console.log('Notification permission granted.');
-        
-        // Firebase Messaging इन्स्टेंस लें
+  // 3. Foreground Message Handle karne ke liye (Safe check)
+  setTimeout(() => {
+    try {
+      if (typeof firebase !== 'undefined' && firebase.messaging && firebase.messaging.isSupported()) {
         const messaging = firebase.messaging();
-
-        // सर्विस वर्कर रजिस्ट्रेशन पास करके FCM Token लें
-        messaging.getToken({ 
-          serviceWorkerRegistration: swRegistration,
-          vapidKey: "यहाँ_अपना_Web_Push_Certificate_Key_डालें" // अगर कंसोल में जनरेट किया है तो यहाँ डाल सकते हैं, वरना खाली भी छोड़ सकते हैं
-        })
-        .then((currentToken) => {
-          if (currentToken) {
-            console.log('FCM Device Token:', currentToken);
-            // इस टोकन को आप चाहें तो अपने डेटाबेस में सेव कर सकते हैं
-          } else {
-            console.log('No registration token available. Request permission to generate one.');
-          }
-        })
-        .catch((err) => {
-          console.error('An error occurred while retrieving token. ', err);
+        messaging.onMessage((payload) => {
+          console.log('Foreground Message received: ', payload);
+          alert(payload.notification.title + '\n' + payload.notification.body);
         });
-
-      } else {
-        console.log('Unable to get permission to notify.');
       }
-    });
-  }
-
-  // 3. जब यूज़र ऐप के अंदर (Foreground) हो, तब मैसेज हैंडल करना
-  if (firebase.messaging.isSupported()) {
-    const messaging = firebase.messaging();
-    messaging.onMessage((payload) => {
-      console.log('Foreground Message received: ', payload);
-      alert(`${payload.notification.title}\n${payload.notification.body}`);
-    });
-  }
-</script>
-
-  
+    } catch (e) {
+      console.log('Messaging not supported or initialized yet');
+    }
+  }, 1000);
+</scrip>
 </body>
 </html>
