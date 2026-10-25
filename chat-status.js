@@ -1,9 +1,9 @@
 // =====================================================================
-// chat-status.js  -  New chat look (runs on chat.html only)  [with status like/views/reply + video]
+// chat-status.js  -  New chat look (runs on chat.html only)
 //  1) Top tab switch:  [GAMES] [CHAT]
 //  2) Bottom bar:  Messages | Status | Settings
 //  3) Chat list without boxes/lines (one continuous list)
-//  4) Status: text or photo, removed automatically after STATUS_HOURS
+//  4) Status: text / photo / video + music, like, views, reply, 2x hold, auto-remove
 //  5) Settings: Notifications, Change password, Lock chat
 // Add this file in chat.html AFTER chat.js.
 // =====================================================================
@@ -16,13 +16,18 @@
     STATUS_HOURS: 24,           // how many hours a status stays (max 24 - Rules also allow 24)
     STATUS_MAX: 10,             // max statuses one user can have at the same time
     TEXT_MAX: 200,              // max characters in a text status
-    CAP_MAX: 100,               // max characters in a photo caption
+    CAP_MAX: 100,               // max characters in a photo/video caption
     REPLY_MAX: 75,              // max characters in status reply (chat message limit is 100)
-    VIDEO_MB: 4, VIDEO_SEC: 20, CHUNK: 150000,   // video limit: size (MB), seconds, chunk size
+    MAX_SEC: 30,                // MAX seconds for video and for music clip (only limit, no MB limit)
     TEXT_SEC: 5,                // seconds a text status stays on screen
     PHOTO_SEC: 6,               // seconds a photo status stays on screen
-    PHOTO_SIDE: 600,            // max photo width/height in pixels
-    PHOTO_QUALITY: 0.6,         // photo quality 0.1 - 1 (higher = clearer, bigger)
+    PHOTO_SIDE: 1080,           // max photo width/height in pixels
+    PHOTO_QUALITY: 0.8,         // photo quality 0.1 - 1 (higher = clearer, bigger)
+    VIDEO_SIDE: 640,            // big videos are re-encoded to this max width/height
+    VIDEO_BPS: 1000000,         // video bitrate when re-encoding (1 Mbps = about 4 MB for 30 sec)
+    SQUEEZE_MB: 5,              // videos bigger than this are re-encoded (made smaller) automatically
+    RAW_MAX_MB: 20,             // only if re-encoding is not possible on the phone: biggest raw video allowed
+    CHUNK: 150000,              // upload piece size (characters)
     BG: [                       // text status background colours (top to bottom)
       ['#2563eb', '#7c3aed'], ['#db2777', '#f97316'], ['#059669', '#0ea5e9'], ['#7c3aed', '#ec4899'],
       ['#b45309', '#facc15'], ['#0f172a', '#334155'], ['#dc2626', '#7f1d1d'], ['#0d9488', '#164e63']
@@ -37,12 +42,18 @@
     myStatus: 'My status', recent: 'Recent updates', tapAdd: 'Tap + to add a status',
     noStatus: 'No status updates yet.\nStatus updates from your chats will appear here.',
     countSep: ' status • ',
-    newStatus: 'New status', textStatus: '✏️ Text status', photoStatus: '📷 Photo status',
-    typePh: 'Type a status', capPh: 'Add a caption...',
+    addStatus: 'Add status', tText: 'Text', tMusic: 'Music', recents: 'Recents',
+    tCam: 'Camera', tPhotos: 'Photos', tVideos: 'Videos',
+    typePh: 'Type a status', capPh: 'Add a caption...', typeOv: 'Text on status',
     maxReached: 'You can post up to {n} statuses at a time. Please delete an old one first.',
     postFail: 'Could not post status. Please check your Database Rules (statuses).',
     confirmDel: 'Delete this status?',
     justNow: 'Just now', minAgo: ' min ago', hrAgo: ' hr ago', dayAgo: ' day ago',
+    viewedBy: 'Viewed by', noViews: 'No views yet', swipeUp: 'Swipe up for views',
+    replyPh: 'Reply...', replyTag: '↩️ Status reply: ',
+    prep: 'Preparing...', tooLong: 'Maximum {s} seconds allowed.',
+    musicFail: 'Could not use this audio file.',
+    tooHeavy: 'This video is too heavy for this phone. Please pick a smaller one.',
     notif: 'Notifications', notifSub: 'Alerts for new messages',
     changePw: 'Change password', pwSub: 'Your chat password',
     curPw: 'Current password', newPw: 'New password ({min}-{max} characters)', newPw2: 'Confirm new password',
@@ -51,11 +62,7 @@
     pwDone: 'Password changed successfully', tryAgain: 'Something went wrong. Please try again.',
     lockNow: 'Lock chat now', lockSub: 'Password will be required next time',
     goGames: 'Go to Games',
-    cancel: 'Cancel', save: 'Save',
-    viewedBy: 'Viewed by', noViews: 'No views yet', swipeUp: 'Swipe up for views',
-    replyPh: 'Reply...', replyTag: '↩️ Status reply: ',
-    videoStatus: '🎥 Video status', videoLoad: 'Loading video...',
-    videoBig: 'Video must be under {mb} MB and {s} seconds.'
+    cancel: 'Cancel', save: 'Save'
   };
 
   var db = firebase.database();
@@ -133,28 +140,12 @@
     '.cnt{color:rgba(255,255,255,.8);font-size:12px;padding-right:6px}',
     '.stv{background:#000}.stv .bars{display:flex;gap:4px;padding:10px 10px 0}',
     '.stv .bar{flex:1;height:3px;border-radius:2px;background:rgba(255,255,255,.3);overflow:hidden}',
-    '.stv .bar i{display:block;height:100%;width:0;background:#fff}',
+    '.stv .bar i{display:block;height:100%;width:0;background:#fff;transition:none}',
     '.stv .who{display:flex;flex-direction:column;flex:1;min-width:0}.stv .who b{font-size:15px}.stv .who span{font-size:12px;opacity:.8}',
     '.stv .stage{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:1}',
     '.stv .stage .tx{font-size:28px;font-weight:700;color:#fff;text-align:center;padding:30px;word-break:break-word;white-space:pre-wrap}',
-    '.stv .stage img{max-width:100%;max-height:100%;object-fit:contain}',
+    '.stv .stage img,.stv .stage video{width:100%;height:100%;object-fit:contain}',
     '.stv .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 16px 28px;text-align:center;color:#fff;font-size:16px;background:linear-gradient(transparent,rgba(0,0,0,.7));z-index:2}',
-    '.stv .tap{position:absolute;top:70px;bottom:60px;width:50%;z-index:2}.stv .tap.l{left:0}.stv .tap.r{right:0}',
-    '.stv .rbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;align-items:center;padding:8px 12px 16px;z-index:4;background:linear-gradient(transparent,rgba(0,0,0,.55))}',
-    '.stv .rbar input{flex:1;min-width:0;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.35);border-radius:22px;color:#fff;font-size:15px;padding:11px 16px;outline:none}',
-    '.stv .rbar button{width:44px;height:44px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:20px;cursor:pointer}',
-    '.stv .rbar .rsd{background:#22c55e}',
-    '.stv .vbar{position:absolute;left:0;right:0;bottom:0;text-align:center;color:#fff;font-size:14px;padding:14px 10px 20px;z-index:4;background:linear-gradient(transparent,rgba(0,0,0,.6));cursor:pointer}',
-    '.stv .vpan{position:absolute;left:0;right:0;bottom:0;height:62%;background:#0f1b47;border-radius:20px 20px 0 0;z-index:6;display:flex;flex-direction:column;border-top:2px solid #22d3ee}',
-    '.stv .vhd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;color:#fff;font-size:16px}',
-    '.stv .vhd button{background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer}',
-    '.stv .vlist{flex:1;overflow-y:auto;padding:0 16px 20px}',
-    '.stv .vrow{display:flex;align-items:center;gap:12px;padding:9px 0}',
-    '.stv .vav{width:44px;height:44px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-weight:700;flex-shrink:0}',
-    '.stv .vav img{width:100%;height:100%;object-fit:cover}',
-    '.stv .grow{flex:1;min-width:0}.stv .vrow .sn{font-weight:700;color:#fff}.stv .vrow .ss{font-size:12px;color:#9fb0d9}.stv .vl{font-size:20px}',
-    '.stv .stage video{max-width:100%;max-height:100%}',
-    '.stv .vload{color:#fff;font-size:14px}',
     /* settings */
     '.setp{display:flex;align-items:center;gap:14px;background:#0f1b47;border:1px solid #1f3a8a;border-radius:14px;padding:14px;margin-bottom:12px}',
     '.setp .big{width:64px;height:64px;border-radius:50%;border:3px solid #22d3ee;background:#1e3a8a;display:flex;align-items:center;justify-content:center;font-size:30px;overflow:hidden;flex-shrink:0}',
@@ -168,7 +159,42 @@
     '.mdl h3{font-size:18px;text-align:center}.mdl input{background:#060c24;border:1px solid #1f3a8a;border-radius:10px;color:#fff;font-size:16px;padding:12px;outline:none}',
     '.mdl .msg{font-size:13px;color:#f87171;min-height:16px}.mdl .msg.ok{color:#4ade80}',
     '.mdl .b2{display:flex;gap:8px}.mdl .b2 button{flex:1;padding:12px;border-radius:10px;border:none;font-size:15px;font-weight:700;cursor:pointer;background:#16245e;color:#fff}.mdl .b2 button.p{background:#2563eb}',
-    '#lockView .lk-back{display:inline-block;color:#cfe3ff;text-decoration:none;font-weight:700;margin:0 auto 10px;max-width:480px}'
+    '#lockView .lk-back{display:inline-block;color:#cfe3ff;text-decoration:none;font-weight:700;margin:0 auto 10px;max-width:480px}',
+    /* viewer: gestures, chips, reply, views */
+    '.stv .gz{position:absolute;left:0;right:0;top:0;bottom:0;z-index:2;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}',
+    '.stv .cap{pointer-events:none}',
+    '.stv .pind{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:64px;color:#fff;opacity:.9;z-index:2;pointer-events:none;text-shadow:0 2px 8px #000}',
+    '.stv .rchip{position:absolute;top:124px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.55);color:#fff;font-size:14px;font-weight:700;padding:6px 12px;border-radius:14px;z-index:3;pointer-events:none}',
+    '.stv .mchip{position:absolute;top:84px;left:14px;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(0,0,0,.45);color:#fff;font-size:13px;padding:6px 12px;border-radius:14px;z-index:3;pointer-events:none}',
+    '.ovt{position:absolute;left:20px;right:20px;top:50%;transform:translateY(-50%);text-align:center;color:#fff;font-size:24px;font-weight:700;background:rgba(0,0,0,.45);border-radius:12px;padding:10px 14px;z-index:2;pointer-events:none;word-break:break-word}',
+    '.stv .rbar{position:absolute;left:0;right:0;bottom:0;display:flex;gap:8px;align-items:center;padding:8px 12px 16px;z-index:4;background:linear-gradient(transparent,rgba(0,0,0,.55))}',
+    '.stv .rbar input{flex:1;min-width:0;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.35);border-radius:22px;color:#fff;font-size:15px;padding:11px 16px;outline:none}',
+    '.stv .rbar button{width:44px;height:44px;border-radius:50%;border:none;background:rgba(0,0,0,.45);color:#fff;font-size:20px;cursor:pointer}',
+    '.stv .rbar .rsd{background:#22c55e}',
+    '.stv .vbar{position:absolute;left:0;right:0;bottom:0;text-align:center;color:#fff;font-size:14px;padding:14px 10px 20px;z-index:4;background:linear-gradient(transparent,rgba(0,0,0,.6));cursor:pointer}',
+    '.stv .vpan{position:absolute;left:0;right:0;bottom:0;height:62%;background:#0f1b47;border-radius:20px 20px 0 0;z-index:6;display:flex;flex-direction:column;border-top:2px solid #22d3ee}',
+    '.stv .vhd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;color:#fff;font-size:16px}',
+    '.stv .vhd button{background:rgba(255,255,255,.12);border:none;color:#fff;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer}',
+    '.stv .vlist{flex:1;overflow-y:auto;padding:0 16px 20px}',
+    '.stv .vrow{display:flex;align-items:center;gap:12px;padding:9px 0}',
+    '.stv .vav{width:44px;height:44px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;overflow:hidden;color:#fff;font-weight:700;flex-shrink:0}',
+    '.stv .vav img{width:100%;height:100%;object-fit:cover}',
+    '.stv .grow{flex:1;min-width:0}.stv .vrow .sn{font-weight:700;color:#fff}.stv .vrow .ss{font-size:12px;color:#9fb0d9}.stv .vl{font-size:20px}',
+    /* composer */
+    '.vload{color:#fff;font-size:15px}',
+    '.mchip2{align-self:flex-start;margin:0 12px;background:rgba(0,0,0,.45);color:#fff;padding:7px 12px;border-radius:16px;font-size:13px;cursor:pointer;z-index:3}',
+    /* add status sheet */
+    '.shw{position:fixed;inset:0;z-index:155;background:rgba(0,0,0,.55);display:flex;align-items:flex-end}',
+    '.shs{width:100%;max-width:480px;margin:0 auto;background:#0f1b47;border-radius:24px 24px 0 0;padding:14px 16px 26px;border-top:2px solid #22d3ee}',
+    '.shh{display:flex;align-items:center;gap:14px;color:#fff;font-size:20px;font-weight:700;margin-bottom:16px}',
+    '.shh button{background:none;border:none;color:#fff;font-size:22px;cursor:pointer}',
+    '.shr{display:flex;gap:22px;margin-bottom:14px}',
+    '.shb{background:none;border:none;color:#fff;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;cursor:pointer}',
+    '.shb .ic{width:64px;height:64px;border-radius:50%;background:#16245e;display:flex;align-items:center;justify-content:center;font-size:26px}',
+    '.shl{color:#9fb0d9;font-size:15px;margin:6px 0 10px}',
+    '.shg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}',
+    '.shg button{aspect-ratio:1;background:#16245e;border:none;border-radius:12px;color:#fff;font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}',
+    '.shg button span{font-size:30px}'
   ].join('\n');
   document.head.appendChild(st);
   /* ---------------- Layout: tabs + panes + bottom bar ---------------- */
@@ -216,7 +242,9 @@
   if (lv) { var back = h('a', 'lk-back', T.backGames); back.href = 'index.html'; lv.insertBefore(back, lv.firstChild); }
 
   /* =================== STATUS =================== */
-  var myList = [], contacts = [];
+var myList = [], contacts = [];
+  var cache = { mine: null, contacts: null };
+  var VC = null;                 // controls of the open viewer (hold / release)
   var seenKey = function () { var C = core(), m = C && C.getMe(); return 'st_seen_' + (m ? m.uid : ''); };
 
   function loadMine() {
@@ -227,7 +255,12 @@
       Object.keys(v).forEach(function (k) {
         var x = v[k];
         if (!x || !x.e) return;
-        if (x.e <= now) { db.ref('statuses/' + me.uid + '/' + k).remove().catch(function () {}); db.ref('statusReacts/' + me.uid + '/' + k).remove().catch(function () {}); db.ref('statusBlobs/' + me.uid + '/' + k).remove().catch(function () {}); return; }   // cleanup of expired ones
+        if (x.e <= now) {   // cleanup of expired ones (with their views, likes and media)
+          db.ref('statuses/' + me.uid + '/' + k).remove().catch(function () {});
+          db.ref('statusReacts/' + me.uid + '/' + k).remove().catch(function () {});
+          db.ref('statusBlobs/' + me.uid + '/' + k).remove().catch(function () {});
+          return;
+        }
         x.id = k; x.uid = me.uid; out.push(x);
       });
       out.sort(function (a, b) { return a.t - b.t; });
@@ -252,33 +285,60 @@
       return arr;
     });
   }
+
+  /* ----- media (photo / video / music) stored in pieces: statusBlobs/uid/sid/c (media) and /m (music) ----- */
+  var bcache = {};
+  function getBlob(x, kind) {
+    var key = x.id + kind;
+    if (bcache[key]) return Promise.resolve(bcache[key]);
+    var need = kind === 'c' ? x.nc : x.mn;
+    return db.ref('statusBlobs/' + x.uid + '/' + x.id + '/' + kind).once('value').then(function (s) {
+      var v = s.val() || {}, keys = Object.keys(v).map(Number).sort(function (a, b) { return a - b; });
+      if (!keys.length || (need && keys.length !== need)) throw new Error('missing');
+      var src = keys.map(function (k) { return v[k]; }).join('');
+      if (src.indexOf('data:') !== 0) throw new Error('bad');
+      bcache[key] = src; return src;
+    });
+  }
+  function prefetch(x) {
+    if (!x) return;
+    if ((x.ty === 'photo' || x.ty === 'video') && !x.im) getBlob(x, 'c').catch(function () {});
+    if (x.mn) getBlob(x, 'm').catch(function () {});
+  }
+  function prefetchFirst(arr) {
+    var seen = lsGet(seenKey());
+    arr.slice(0, 6).forEach(function (c) {
+      var f = c.list.filter(function (x) { return !seen[x.id]; })[0];
+      if (f) prefetch(f);
+    });
+  }
+
   function renderStatus() {
     var C = core(), me = C && C.getMe();
     paneS.innerHTML = '';
-    if (!me) { paneS.appendChild(h('div', 'sempty', T.loading)); return; }
+    if (!me) return;
     var row = h('div', 'srow');
     var av = h('div', 'sav none'); var inner = h('div'); setAv(inner, me.photo); av.appendChild(inner);
-    var g = h('div', 'grow'); g.appendChild(h('div', 'sn', T.myStatus)); var sub = h('div', 'ss', T.loading); g.appendChild(sub);
+    var g = h('div', 'grow'); g.appendChild(h('div', 'sn', T.myStatus)); var sub = h('div', 'ss', ''); g.appendChild(sub);
     var add = h('button', 'sadd', '+'); add.type = 'button';
     row.appendChild(av); row.appendChild(g); row.appendChild(add);
     paneS.appendChild(row);
+    row.onclick = addMenu;
     add.addEventListener('click', function (e) { e.stopPropagation(); addMenu(); });
 
     paneS.appendChild(h('div', 'stitle', T.recent));
     var box = h('div'); paneS.appendChild(box);
-    box.appendChild(h('div', 'sempty', T.loading));
 
-    loadMine().then(function (list) {
+    function paintMine(list) {
       myList = list;
       if (list.length) {
         av.className = 'sav'; sub.textContent = list.length + T.countSep + ago(list[list.length - 1].t);
         row.onclick = function () { openViewer({ name: T.myStatus, photo: me.photo, list: list, mine: true }); };
       } else {
-        sub.textContent = T.tapAdd;
-        row.onclick = addMenu;
+        av.className = 'sav none'; sub.textContent = T.tapAdd; row.onclick = addMenu;
       }
-    });
-    loadContacts().then(function (arr) {
+    }
+    function paintContacts(arr) {
       contacts = arr; box.innerHTML = '';
       if (!arr.length) { box.appendChild(h('div', 'sempty', T.noStatus)); box.firstChild.style.whiteSpace = 'pre-line'; return; }
       var seen = lsGet(seenKey());
@@ -291,184 +351,344 @@
         r.addEventListener('click', function () { openViewer(c); });
         box.appendChild(r);
       });
-    });
+    }
+    // show the last known list at once (no "Loading..."), then refresh quietly
+    if (cache.mine) paintMine(cache.mine);
+    if (cache.contacts) paintContacts(cache.contacts);
+    loadMine().then(function (l) { cache.mine = l; paintMine(l); });
+    loadContacts().then(function (arr) { cache.contacts = arr; paintContacts(arr); prefetchFirst(arr); });
   }
 
-  /* ----- create status ----- */
-  function addMenu() {
-    if (myList.length >= CONFIG.STATUS_MAX) { alert(T.maxReached.replace('{n}', CONFIG.STATUS_MAX)); return; }
-    var m = modal(T.newStatus, function (box, close) {
-      var a = h('button', 'p', T.textStatus); a.type = 'button';
-      var b = h('button', 'p', T.photoStatus); b.type = 'button';
-      var v = h('button', 'p', T.videoStatus); v.type = 'button';
-      var c = h('button', '', T.cancel); c.type = 'button';
-      [a, b, v, c].forEach(function (x) { x.style.cssText = 'width:100%;margin-top:2px'; box.appendChild(x); });
-      a.onclick = function () { close(); composeText(); };
-      b.onclick = function () { close(); pickPhoto(); };
-      v.onclick = function () { close(); pickVideo(); };
-      c.onclick = close;
-    });
-  }
-
-  function publish(obj) {
-    var C = core(), me = C.getMe();
-    obj.t = TS; obj.e = nowS() + Math.min(24, CONFIG.STATUS_HOURS) * 3600000;
-    return db.ref('statuses/' + me.uid).push(obj);
-  }
-
+  /* ----- helpers for creating a status ----- */
   var cmp = h('div', 'ov'); document.body.appendChild(cmp);
   function closeCmp() { cmp.style.display = 'none'; cmp.innerHTML = ''; }
+  function busy(msg) {
+    cmp.innerHTML = ''; cmp.style.display = 'flex'; cmp.style.background = '#0b1544';
+    var b = h('div', 'cmp-body'), t = h('div', 'vload', msg); b.appendChild(t); cmp.appendChild(b);
+    return function (m) { t.textContent = m; };
+  }
+  function pickFileThen(accept, capture, cb) {
+    var f = document.createElement('input'); f.type = 'file'; f.accept = accept;
+    if (capture) f.setAttribute('capture', 'environment');
+    f.style.display = 'none'; document.body.appendChild(f);
+    f.addEventListener('change', function () { var file = f.files[0]; f.remove(); if (file) cb(file); });
+    f.click();
+  }
 
-  function composeText() {
+  // Add status sheet (Text, Music, then phone gallery / camera)
+  function addMenu() {
+    if (myList.length >= CONFIG.STATUS_MAX) { alert(T.maxReached.replace('{n}', CONFIG.STATUS_MAX)); return; }
+    var bg = h('div', 'shw'), sh = h('div', 'shs');
+    function close() { bg.remove(); }
+    bg.addEventListener('click', function (e) { if (e.target === bg) close(); });
+    var hd = h('div', 'shh'); var x = h('button', '', '✕'); x.type = 'button'; x.onclick = close;
+    hd.appendChild(x); hd.appendChild(h('span', '', T.addStatus)); sh.appendChild(hd);
+
+    var row = h('div', 'shr');
+    function big(icon, label, fn) {
+      var b = h('button', 'shb'); b.type = 'button';
+      b.appendChild(h('span', 'ic', icon)); b.appendChild(h('span', '', label)); b.onclick = fn; row.appendChild(b);
+    }
+    big('✏️', T.tText, function () { close(); composeText(null); });
+    big('🎵', T.tMusic, function () {
+      close();
+      pickFileThen('audio/*', false, function (file) {
+        busy(T.prep);
+        prepMusic(file).then(function (m) { composeText(m); }, function () { closeCmp(); alert(T.musicFail); });
+      });
+    });
+    sh.appendChild(row);
+
+    sh.appendChild(h('div', 'shl', T.recents));
+    var grid = h('div', 'shg');
+    function tile(icon, label, accept, cap) {
+      var b = h('button'); b.type = 'button';
+      b.appendChild(h('span', '', icon)); b.appendChild(document.createTextNode(label));
+      b.onclick = function () { close(); pickFileThen(accept, cap, handleFile); };
+      grid.appendChild(b);
+    }
+    tile('📷', T.tCam, 'image/*,video/*', true);
+    tile('🖼️', T.tPhotos, 'image/*', false);
+    tile('🎥', T.tVideos, 'video/*', false);
+    sh.appendChild(grid);
+    bg.appendChild(sh); document.body.appendChild(bg);
+  }
+
+  function handleFile(file) {
+    if (file.type.indexOf('image/') === 0) preparePhoto(file);
+    else if (file.type.indexOf('video/') === 0) prepareVideo(file);
+  }
+
+  /* ----- publish (media and music go in pieces, then the small status record) ----- */
+  function publishStatus(o, media, music, onProg) {
+    var C = core(), me = C.getMe();
+    var ref = db.ref('statuses/' + me.uid).push(), sid = ref.key;
+    var jobs = [], total = 0, done = 0;
+    function up(kind, data) {
+      var n = Math.ceil(data.length / CONFIG.CHUNK); total += n;
+      for (var i = 0; i < n; i++) {
+        (function (i) {
+          jobs.push(db.ref('statusBlobs/' + me.uid + '/' + sid + '/' + kind + '/' + i)
+            .set(data.substr(i * CONFIG.CHUNK, CONFIG.CHUNK))
+            .then(function () { done++; if (onProg) onProg(Math.round(done * 100 / total)); }));
+        })(i);
+      }
+      return n;
+    }
+    if (media) o.nc = up('c', media);
+    if (music) { o.mn = up('m', music.data); o.md = music.sec; o.mnm = music.name; }
+    o.t = TS; o.e = nowS() + Math.min(24, CONFIG.STATUS_HOURS) * 3600000;
+    return Promise.all(jobs).then(function () { return ref.set(o); }).catch(function (err) {
+      db.ref('statusBlobs/' + me.uid + '/' + sid).remove().catch(function () {});
+      throw err;
+    });
+  }
+
+  /* ----- music: any audio file -> first MAX_SEC seconds, small mono WAV ----- */
+  function wavUrl(ch, rate) {
+    var n = ch.length, b = new ArrayBuffer(44 + n * 2), v = new DataView(b), i;
+    function w(o, s) { for (var k = 0; k < s.length; k++) v.setUint8(o + k, s.charCodeAt(k)); }
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+    w(36, 'data'); v.setUint32(40, n * 2, true);
+    for (i = 0; i < n; i++) { var s = Math.max(-1, Math.min(1, ch[i])); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true); }
+    var bytes = new Uint8Array(b), bin = '';
+    for (i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return 'data:audio/wav;base64,' + btoa(bin);
+  }
+  function prepMusic(file) {
+    return new Promise(function (res, rej) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      var OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!AC || !OC) { rej(new Error('noaudio')); return; }
+      var rd = new FileReader();
+      rd.onerror = rej;
+      rd.onload = function () {
+        var ac = new AC();
+        ac.decodeAudioData(rd.result, function (buf) {
+          try { ac.close(); } catch (e) {}
+          var sec = Math.max(1, Math.min(CONFIG.MAX_SEC, Math.floor(buf.duration)));
+          var RATE = 22050, oc = new OC(1, sec * RATE, RATE), src = oc.createBufferSource();
+          src.buffer = buf; src.connect(oc.destination); src.start(0);
+          oc.startRendering().then(function (out) {
+            res({ data: wavUrl(out.getChannelData(0), RATE), sec: sec, name: (file.name || 'Music').replace(/\.[^.]+$/, '').slice(0, 40) });
+          }, rej);
+        }, rej);
+      };
+      rd.readAsArrayBuffer(file);
+    });
+  }
+  // music button + small chip (tap chip to remove)
+  function musicBox(btn) {
+    var m = null, chip = h('div', 'mchip2'); chip.style.display = 'none';
+    function paint() { chip.style.display = m ? '' : 'none'; chip.textContent = m ? '🎵 ' + m.name + '  ✕' : ''; }
+    chip.onclick = function () { m = null; paint(); };
+    btn.onclick = function () {
+      pickFileThen('audio/*', false, function (file) {
+        var old = btn.textContent; btn.disabled = true; btn.textContent = '⏳';
+        prepMusic(file).then(function (r) { m = r; paint(); }, function () { alert(T.musicFail); })
+          .then(function () { btn.disabled = false; btn.textContent = old; });
+      });
+    };
+    return { chip: chip, get: function () { return m; }, set: function (v) { m = v; paint(); } };
+  }
+
+  /* ----- text status ----- */
+  function composeText(pre) {
     var bg = Math.floor(Math.random() * CONFIG.BG.length);
     cmp.innerHTML = ''; cmp.style.display = 'flex'; cmp.style.background = grad(bg);
     var top = h('div', 'top');
     var x = h('button', '', '✕'); x.type = 'button'; x.onclick = closeCmp;
     var sp = h('div', 'sp'); var cnt = h('span', 'cnt', '0/' + CONFIG.TEXT_MAX);
+    var bm = h('button', '', '🎵'); bm.type = 'button';
     var pal = h('button', '', '🎨'); pal.type = 'button';
-    top.appendChild(x); top.appendChild(sp); top.appendChild(cnt); top.appendChild(pal);
+    top.appendChild(x); top.appendChild(sp); top.appendChild(cnt); top.appendChild(bm); top.appendChild(pal);
+    var mb = musicBox(bm); if (pre) mb.set(pre);
     var body = h('div', 'cmp-body'); var ta = h('textarea'); ta.placeholder = T.typePh; ta.maxLength = CONFIG.TEXT_MAX; body.appendChild(ta);
     var bot = h('div', 'cmp-bot'); var s2 = h('div', 'sp'); s2.style.flex = '1';
     var send = h('button', '', '➤'); send.type = 'button'; bot.appendChild(s2); bot.appendChild(send);
-    cmp.appendChild(top); cmp.appendChild(body); cmp.appendChild(bot);
+    cmp.appendChild(top); cmp.appendChild(mb.chip); cmp.appendChild(body); cmp.appendChild(bot);
     ta.oninput = function () { cnt.textContent = ta.value.length + '/' + CONFIG.TEXT_MAX; };
     pal.onclick = function () { bg = (bg + 1) % CONFIG.BG.length; cmp.style.background = grad(bg); };
     send.onclick = function () {
-      var t = ta.value.trim(); if (!t) return;
-      send.disabled = true;
-      publish({ ty: 'text', tx: t.slice(0, CONFIG.TEXT_MAX), bg: bg })
-        .then(function () { closeCmp(); renderStatus(); })
-        .catch(function () { send.disabled = false; alert(T.postFail); });
+      var t = ta.value.trim(); if (!t && !mb.get()) return;
+      send.disabled = true; send.style.fontSize = '12px';
+      var o = { ty: 'text', bg: bg };
+      if (t) o.tx = t.slice(0, CONFIG.TEXT_MAX);
+      publishStatus(o, null, mb.get(), function (p) { send.textContent = p + '%'; })
+        .then(function () { cache.mine = null; closeCmp(); renderStatus(); })
+        .catch(function () { send.disabled = false; send.textContent = '➤'; send.style.fontSize = ''; alert(T.postFail); });
     };
     setTimeout(function () { ta.focus(); }, 100);
   }
 
-  function pickPhoto() {
-    var f = document.createElement('input'); f.type = 'file'; f.accept = 'image/*'; f.style.display = 'none';
-    document.body.appendChild(f);
-    f.addEventListener('change', function () {
-      var file = f.files[0]; f.remove();
-      if (!file || file.type.indexOf('image/') !== 0) return;
-      var rd = new FileReader();
-      rd.onload = function (e) {
-        var im = new Image();
-        im.onload = function () {
-          var sc = Math.min(1, CONFIG.PHOTO_SIDE / Math.max(im.width, im.height));
-          var cv = document.createElement('canvas'); cv.width = Math.round(im.width * sc); cv.height = Math.round(im.height * sc);
-          cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
-          composePhoto(cv.toDataURL('image/jpeg', CONFIG.PHOTO_QUALITY));
-        };
-        im.src = e.target.result;
+  /* ----- photo / video: choose, prepare, then composer with Music and Text at top right ----- */
+  function preparePhoto(file) {
+    var rd = new FileReader();
+    rd.onload = function (e) {
+      var im = new Image();
+      im.onload = function () {
+        var sc = Math.min(1, CONFIG.PHOTO_SIDE / Math.max(im.width, im.height));
+        var cv = document.createElement('canvas'); cv.width = Math.round(im.width * sc); cv.height = Math.round(im.height * sc);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        composeMedia('photo', cv.toDataURL('image/jpeg', CONFIG.PHOTO_QUALITY), 0);
       };
-      rd.readAsDataURL(file);
-    });
-    f.click();
-  }
-  function composePhoto(data) {
-    cmp.innerHTML = ''; cmp.style.display = 'flex'; cmp.style.background = '#000';
-    var top = h('div', 'top'); var x = h('button', '', '✕'); x.type = 'button'; x.onclick = closeCmp; top.appendChild(x);
-    var body = h('div', 'cmp-body'); var im = h('img'); im.src = data; body.appendChild(im);
-    var bot = h('div', 'cmp-bot'); var cap = h('input'); cap.placeholder = T.capPh; cap.maxLength = CONFIG.CAP_MAX;
-    var send = h('button', '', '➤'); send.type = 'button'; bot.appendChild(cap); bot.appendChild(send);
-    cmp.appendChild(top); cmp.appendChild(body); cmp.appendChild(bot);
-    send.onclick = function () {
-      send.disabled = true;
-      var o = { ty: 'photo', im: data };
-      if (cap.value.trim()) o.cp = cap.value.trim().slice(0, CONFIG.CAP_MAX);
-      publish(o).then(function () { closeCmp(); renderStatus(); })
-        .catch(function () { send.disabled = false; alert(T.postFail); });
+      im.src = e.target.result;
     };
+    rd.readAsDataURL(file);
   }
-
-  /* ----- video status ----- */
-  var vcache = {};
-  function publishVideo(dataUrl, dur, cap, onProg) {
-    var C = core(), me = C.getMe();
-    var ref = db.ref('statuses/' + me.uid).push(), sid = ref.key;
-    var n = Math.ceil(dataUrl.length / CONFIG.CHUNK), jobs = [], done = 0;
-    for (var i = 0; i < n; i++) {
-      (function (i) {
-        jobs.push(db.ref('statusBlobs/' + me.uid + '/' + sid + '/c/' + i)
-          .set(dataUrl.substr(i * CONFIG.CHUNK, CONFIG.CHUNK))
-          .then(function () { done++; if (onProg) onProg(Math.round(done * 100 / n)); }));
-      })(i);
-    }
-    return Promise.all(jobs).then(function () {
-      var o = { ty: 'video', nc: n, d: dur, t: TS, e: nowS() + Math.min(24, CONFIG.STATUS_HOURS) * 3600000 };
-      if (cap) o.cp = cap;
-      return ref.set(o);
-    }).catch(function (err) {
-      db.ref('statusBlobs/' + me.uid + '/' + sid).remove().catch(function () {});
-      throw err;
-    });
-  }
-  function pickVideo() {
-    var f = document.createElement('input'); f.type = 'file'; f.accept = 'video/*'; f.style.display = 'none';
-    document.body.appendChild(f);
-    var bigMsg = T.videoBig.replace('{mb}', CONFIG.VIDEO_MB).replace('{s}', CONFIG.VIDEO_SEC);
-    f.addEventListener('change', function () {
-      var file = f.files[0]; f.remove();
-      if (!file || file.type.indexOf('video/') !== 0) return;
-      if (file.size > CONFIG.VIDEO_MB * 1048576) { alert(bigMsg); return; }
-      var url = URL.createObjectURL(file), v = document.createElement('video');
-      v.preload = 'metadata';
-      v.onloadedmetadata = function () {
-        var d = isFinite(v.duration) ? Math.round(v.duration) : 0; URL.revokeObjectURL(url);
-        if (!d || d > CONFIG.VIDEO_SEC) { alert(bigMsg); return; }
+  function prepareVideo(file) {
+    var url = URL.createObjectURL(file), v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = function () {
+      var d = isFinite(v.duration) ? Math.round(v.duration) : 0;
+      if (!d) { URL.revokeObjectURL(url); alert(T.tryAgain); return; }
+      if (v.duration > CONFIG.MAX_SEC + 0.5) { URL.revokeObjectURL(url); alert(T.tooLong.replace('{s}', CONFIG.MAX_SEC)); return; }
+      var upd = busy(T.prep);
+      function raw() {
+        if (file.size > CONFIG.RAW_MAX_MB * 1048576) { URL.revokeObjectURL(url); closeCmp(); alert(T.tooHeavy); return; }
         var rd = new FileReader();
-        rd.onload = function (e) { composeVideo(e.target.result, d); };
+        rd.onload = function (e) { URL.revokeObjectURL(url); composeMedia('video', e.target.result, d); };
         rd.readAsDataURL(file);
-      };
-      v.onerror = function () { alert(T.tryAgain); };
-      v.src = url;
-    });
-    f.click();
+      }
+      if (file.size > CONFIG.SQUEEZE_MB * 1048576 && window.MediaRecorder) {
+        squeezeVideo(url, d, function (p) { upd(T.prep + ' ' + p + '%'); })
+          .then(function (data) { URL.revokeObjectURL(url); composeMedia('video', data, d); }, raw);
+      } else raw();
+    };
+    v.onerror = function () { URL.revokeObjectURL(url); alert(T.tryAgain); };
+    v.src = url;
   }
-  function composeVideo(data, d) {
+  // re-record a big video at lower quality (takes about as long as the video itself)
+  function squeezeVideo(url, dur, onProg) {
+    return new Promise(function (res, rej) {
+      var MR = window.MediaRecorder;
+      var mime = ['video/webm;codecs=vp8,opus', 'video/webm'].filter(function (m) { return MR && MR.isTypeSupported(m); })[0];
+      if (!mime) { rej(new Error('nomime')); return; }
+      var v = document.createElement('video'); v.src = url; v.setAttribute('playsinline', ''); v.preload = 'auto';
+      v.onerror = function () { rej(new Error('verr')); };
+      v.onloadedmetadata = function () {
+        var sc = Math.min(1, CONFIG.VIDEO_SIDE / Math.max(v.videoWidth, v.videoHeight));
+        var cv = document.createElement('canvas');
+        cv.width = Math.max(2, Math.round(v.videoWidth * sc) & ~1); cv.height = Math.max(2, Math.round(v.videoHeight * sc) & ~1);
+        if (!cv.captureStream) { rej(new Error('nocap')); return; }
+        var cx = cv.getContext('2d'), stream = cv.captureStream(24), ac = null;
+        try {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) {
+            ac = new AC();
+            var sn = ac.createMediaElementSource(v), ad = ac.createMediaStreamDestination();
+            sn.connect(ad);
+            ad.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
+            if (ac.state === 'suspended') ac.resume();
+          }
+        } catch (e) {}
+        var rec, chunks = [];
+        try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: CONFIG.VIDEO_BPS, audioBitsPerSecond: 64000 }); }
+        catch (e) { rej(e); return; }
+        rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = function () {
+          if (ac) { try { ac.close(); } catch (e) {} }
+          var rd = new FileReader();
+          rd.onload = function () { res(rd.result); };
+          rd.onerror = rej;
+          rd.readAsDataURL(new Blob(chunks, { type: 'video/webm' }));
+        };
+        function frame() {
+          cx.drawImage(v, 0, 0, cv.width, cv.height);
+          if (onProg && dur) onProg(Math.min(99, Math.round(v.currentTime * 100 / dur)));
+          if (!v.ended && rec.state !== 'inactive') requestAnimationFrame(frame);
+        }
+        v.onended = function () { setTimeout(function () { if (rec.state !== 'inactive') rec.stop(); }, 250); };
+        rec.start(500);
+        var p = v.play(); if (p && p.catch) p.catch(function (e) { try { rec.stop(); } catch (er) {} rej(e); });
+        frame();
+      };
+    });
+  }
+  function composeMedia(kind, data, d) {
+    var ov = '';
     cmp.innerHTML = ''; cmp.style.display = 'flex'; cmp.style.background = '#000';
-    var top = h('div', 'top'); var x = h('button', '', '✕'); x.type = 'button'; x.onclick = closeCmp; top.appendChild(x);
-    var body = h('div', 'cmp-body'); var vd = h('video'); vd.src = data; vd.controls = true; vd.setAttribute('playsinline', '');
-    vd.style.cssText = 'max-width:100%;max-height:70vh;border-radius:10px'; body.appendChild(vd);
+    var top = h('div', 'top');
+    var x = h('button', '', '✕'); x.type = 'button'; x.onclick = closeCmp;
+    var bm = h('button', '', '🎵'); bm.type = 'button';
+    var bt = h('button', '', 'Aa'); bt.type = 'button';
+    top.appendChild(x); top.appendChild(h('div', 'sp')); top.appendChild(bm); top.appendChild(bt);
+    var mb = musicBox(bm);
+    var body = h('div', 'cmp-body'); body.style.position = 'relative';
+    var el;
+    if (kind === 'video') { el = h('video'); el.src = data; el.controls = true; el.setAttribute('playsinline', ''); }
+    else { el = h('img'); el.src = data; }
+    el.style.cssText = 'max-width:100%;max-height:70vh;border-radius:10px';
+    body.appendChild(el);
+    var ovEl = h('div', 'ovt'); ovEl.style.display = 'none'; body.appendChild(ovEl);
     var bot = h('div', 'cmp-bot'); var cap = h('input'); cap.placeholder = T.capPh; cap.maxLength = CONFIG.CAP_MAX;
     var send = h('button', '', '➤'); send.type = 'button'; bot.appendChild(cap); bot.appendChild(send);
-    cmp.appendChild(top); cmp.appendChild(body); cmp.appendChild(bot);
+    cmp.appendChild(top); cmp.appendChild(mb.chip); cmp.appendChild(body); cmp.appendChild(bot);
+    bt.onclick = function () {
+      modal(T.typeOv, function (box, close) {
+        var i = h('input'); i.maxLength = 80; i.value = ov; i.placeholder = T.typePh; box.appendChild(i);
+        var b2 = h('div', 'b2'), c = h('button', '', T.cancel), s = h('button', 'p', T.save);
+        c.type = s.type = 'button'; b2.appendChild(c); b2.appendChild(s); box.appendChild(b2);
+        c.onclick = close;
+        s.onclick = function () { ov = i.value.trim().slice(0, 80); ovEl.textContent = ov; ovEl.style.display = ov ? '' : 'none'; close(); };
+        setTimeout(function () { i.focus(); }, 100);
+      });
+    };
     send.onclick = function () {
       send.disabled = true; cap.disabled = true; send.style.fontSize = '12px';
-      publishVideo(data, d, cap.value.trim().slice(0, CONFIG.CAP_MAX), function (p) { send.textContent = p + '%'; })
-        .then(function () { closeCmp(); renderStatus(); })
+      var o = { ty: kind };
+      if (kind === 'video') o.d = d;
+      if (ov) o.ov = ov;
+      if (cap.value.trim()) o.cp = cap.value.trim().slice(0, CONFIG.CAP_MAX);
+      publishStatus(o, data, mb.get(), function (p) { send.textContent = p + '%'; })
+        .then(function () { cache.mine = null; closeCmp(); renderStatus(); })
         .catch(function () { send.disabled = false; cap.disabled = false; send.textContent = '➤'; send.style.fontSize = ''; alert(T.postFail); });
     };
   }
-  function getVideo(x) {
-    if (vcache[x.id]) return Promise.resolve(vcache[x.id]);
-    return db.ref('statusBlobs/' + x.uid + '/' + x.id + '/c').once('value').then(function (s) {
-      var v = s.val() || {}, keys = Object.keys(v).map(Number).sort(function (a, b) { return a - b; });
-      if (!keys.length || (x.nc && keys.length !== x.nc)) throw new Error('missing');
-      var src = keys.map(function (k) { return v[k]; }).join('');
-      if (src.indexOf('data:video/') !== 0) throw new Error('bad');
-      vcache[x.id] = src; return src;
-    });
-  }
 
-  /* ----- view status ----- */
+  /* ----- view status (full screen: tap = pause, hold = 2x, swipe left/right = next/back, swipe up = views) ----- */
   var stv = h('div', 'ov stv'); document.body.appendChild(stv);
-  var vt = null;
+  var vt = null, curCleanup = null;
+  function stopT() { if (vt) { clearInterval(vt); vt = null; } }
   function closeViewer() {
-    if (vt) { clearTimeout(vt); vt = null; }
-    stv.style.display = 'none'; stv.innerHTML = ''; stv.ontouchstart = null; stv.ontouchend = null; vcache = {};
+    stopT();
+    if (curCleanup) { curCleanup(); curCleanup = null; }
+    stv.style.display = 'none'; stv.innerHTML = '';
     if (paneS.style.display !== 'none') renderStatus();
   }
   function openViewer(who) {
-    var list = who.list, seen = lsGet(seenKey()), idx = 0;
+    var list = who.list, seen = lsGet(seenKey()), idx = 0, me0 = core().getMe();
     for (var i = 0; i < list.length; i++) { if (!seen[list[i].id]) { idx = i; break; } }
     stv.style.display = 'flex';
+    var userPause = false, ext = 0, rate = 1, ready = false, elapsed = 0, dur = 5, token = 0;
+    var vidEl = null, audEl = null;
+
+    function paused() { return userPause || ext > 0; }
+    function play(el) { var p = el.play(); if (p && p.catch) p.catch(function () {}); }
+    function sync() {
+      if (vidEl) { vidEl.playbackRate = rate; if (!ready || paused()) vidEl.pause(); else play(vidEl); }
+      if (audEl) { audEl.playbackRate = rate; if (!ready || paused()) audEl.pause(); else play(audEl); }
+      var pi = stv.querySelector('.pind'); if (pi) pi.style.display = userPause ? '' : 'none';
+      var rc = stv.querySelector('.rchip'); if (rc) rc.style.display = rate > 1 ? '' : 'none';
+    }
+    function dropMedia() {
+      if (vidEl) { try { vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); } catch (e) {} vidEl = null; }
+      if (audEl) { try { audEl.pause(); } catch (e) {} audEl = null; }
+    }
+    VC = { hold: function () { ext++; sync(); }, release: function () { ext = Math.max(0, ext - 1); sync(); } };
+    curCleanup = function () { token++; dropMedia(); VC = null; };
+
     function draw() {
-      if (vt) { clearTimeout(vt); vt = null; }
+      stopT(); dropMedia();
       if (idx >= list.length) { closeViewer(); return; }
       if (idx < 0) idx = 0;
-      var x = list[idx], sec = x.ty === 'photo' ? CONFIG.PHOTO_SEC : (x.ty === 'video' ? Math.max(1, x.d || 10) : CONFIG.TEXT_SEC);
+      var my = ++token, x = list[idx], heart = null;
+      userPause = false; ext = 0; rate = 1; ready = false; elapsed = 0;
       seen[x.id] = 1; lsSet(seenKey(), seen);
-      var me0 = core().getMe();
+
+      // tell the owner I viewed it
       if (!who.mine) {
         var rr = db.ref('statusReacts/' + x.uid + '/' + x.id + '/' + me0.uid);
         rr.once('value').then(function (sn) {
@@ -476,48 +696,68 @@
           if (heart && sn.val() && sn.val().l) heart.textContent = '❤️';
         }).catch(function () {});
       }
+
+      var base = x.ty === 'video' ? Math.max(1, x.d || 10) : (x.ty === 'photo' ? CONFIG.PHOTO_SEC : CONFIG.TEXT_SEC);
+      if (x.mn && x.ty !== 'video') base = Math.max(base, Math.min(CONFIG.MAX_SEC, x.md || base));
+      dur = base;
+
       stv.innerHTML = '';
       stv.style.background = x.ty === 'text' ? grad(x.bg || 0) : '#000';
       var bars = h('div', 'bars');
-      list.forEach(function (_, k) { var b = h('div', 'bar'); var f = h('i'); if (k < idx) f.style.width = '100%'; if (k === idx && x.ty !== 'video') { f.style.transition = 'width ' + sec + 's linear'; setTimeout(function () { f.style.width = '100%'; }, 30); } b.appendChild(f); bars.appendChild(b); });
+      list.forEach(function (_, k) { var b = h('div', 'bar'), f = h('i'); if (k < idx) f.style.width = '100%'; b.appendChild(f); bars.appendChild(b); });
       var top = h('div', 'top');
       var a = h('div', 'avatar'); a.style.cssText = 'width:38px;height:38px;border-radius:50%;background:#1e3a8a;display:flex;align-items:center;justify-content:center;overflow:hidden'; setAv(a, who.photo);
       var wh = h('div', 'who'); wh.appendChild(h('b', '', who.name)); wh.appendChild(h('span', '', ago(x.t)));
       top.appendChild(a); top.appendChild(wh);
-      if (who.mine) { var del = h('button', '', '🗑'); del.type = 'button'; del.onclick = function (e) {
-        e.stopPropagation();
-        if (!confirm(T.confirmDel)) return;
-        db.ref('statuses/' + x.uid + '/' + x.id).remove().catch(function () {});
-        db.ref('statusReacts/' + x.uid + '/' + x.id).remove().catch(function () {});
-        db.ref('statusBlobs/' + x.uid + '/' + x.id).remove().catch(function () {});
-        list.splice(idx, 1); myList = list; draw();
-      }; top.appendChild(del); }
+      if (who.mine) {
+        var del = h('button', '', '🗑'); del.type = 'button';
+        del.onclick = function (e) {
+          e.stopPropagation();
+          if (!confirm(T.confirmDel)) return;
+          db.ref('statuses/' + x.uid + '/' + x.id).remove().catch(function () {});
+          db.ref('statusReacts/' + x.uid + '/' + x.id).remove().catch(function () {});
+          db.ref('statusBlobs/' + x.uid + '/' + x.id).remove().catch(function () {});
+          list.splice(idx, 1); myList = list; cache.mine = null; draw();
+        };
+        top.appendChild(del);
+      }
       var cl = h('button', '', '✕'); cl.type = 'button'; cl.onclick = closeViewer; top.appendChild(cl);
       var stage = h('div', 'stage');
-      if (x.ty === 'photo') { var im = h('img'); im.src = safeSrc(x.im); stage.appendChild(im); }
-      else if (x.ty === 'video') {
-        var ld = h('div', 'vload', T.videoLoad); stage.appendChild(ld);
-        var myIdx = idx;
-        getVideo(x).then(function (src) {
-          if (idx !== myIdx || !stage.parentNode) return;
-          var vd = h('video'); vd.src = src; vd.setAttribute('playsinline', '');
-          vd.onplaying = function () {
-            var bi = bars.children[idx] && bars.children[idx].firstChild;
-            if (bi && !bi.style.width) { bi.style.transition = 'width ' + sec + 's linear'; setTimeout(function () { bi.style.width = '100%'; }, 30); }
-          };
-          vd.onended = function () { idx++; draw(); };
-          stage.innerHTML = ''; stage.appendChild(vd);
-          var pp = vd.play(); if (pp && pp.catch) pp.catch(function () { vd.controls = true; });
-        }).catch(function () { ld.textContent = T.tryAgain; });
-      }
-      else stage.appendChild(h('div', 'tx', x.tx || ''));
       stv.appendChild(bars); stv.appendChild(top); stv.appendChild(stage);
+      if (x.mn && x.mnm) stv.appendChild(h('div', 'mchip', '🎵 ' + x.mnm));
+      if (x.ov && x.ty !== 'text') stv.appendChild(h('div', 'ovt', x.ov));
       if ((x.ty === 'photo' || x.ty === 'video') && x.cp) stv.appendChild(h('div', 'cap', x.cp));
-      var l = h('div', 'tap l'), r = h('div', 'tap r');
-      l.onclick = function () { idx--; draw(); }; r.onclick = function () { idx++; draw(); };
-      stv.appendChild(l); stv.appendChild(r);
+      var pind = h('div', 'pind', '⏸'); pind.style.display = 'none'; stv.appendChild(pind);
+      var rchip = h('div', 'rchip', '2x ▶▶'); rchip.style.display = 'none'; stv.appendChild(rchip);
+
+      // touch layer: tap = pause/play, hold = 2x, swipe = next/back, swipe up (own status) = views
+      var gz = h('div', 'gz'); stv.appendChild(gz);
+      var sx = 0, sy = 0, moved = false, holdT = null, holding = false;
+      gz.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+      gz.addEventListener('pointerdown', function (e) {
+        sx = e.clientX; sy = e.clientY; moved = false; holding = false; clearTimeout(holdT);
+        holdT = setTimeout(function () { if (!moved) { holding = true; rate = 2; sync(); } }, 280);
+      });
+      gz.addEventListener('pointermove', function (e) {
+        if (Math.abs(e.clientX - sx) > 12 || Math.abs(e.clientY - sy) > 12) {
+          moved = true; clearTimeout(holdT);
+          if (holding) { holding = false; rate = 1; sync(); }
+        }
+      });
+      function endP(e, cancelled) {
+        clearTimeout(holdT);
+        if (holding) { holding = false; rate = 1; sync(); return; }
+        if (cancelled) return;
+        var dx = e.clientX - sx, dy = e.clientY - sy;
+        if (!moved) { userPause = !userPause; sync(); return; }
+        if (Math.abs(dx) > Math.abs(dy)) {
+          if (dx < -60) { idx++; draw(); } else if (dx > 60) { idx--; draw(); }
+        } else if (dy < -60 && who.mine) openViews(x);
+      }
+      gz.addEventListener('pointerup', function (e) { endP(e, false); });
+      gz.addEventListener('pointercancel', function (e) { endP(e, true); });
+
       var capEl = stv.querySelector('.cap'); if (capEl) capEl.style.bottom = '64px';
-      var heart = null, sy = null;
       if (!who.mine) {
         var rb = h('div', 'rbar');
         var rin = h('input'); rin.placeholder = T.replyPh; rin.maxLength = CONFIG.REPLY_MAX;
@@ -525,12 +765,8 @@
         var rsend = h('button', 'rsd', '➤'); rsend.type = 'button';
         rb.appendChild(rin); rb.appendChild(heart); rb.appendChild(rsend); stv.appendChild(rb);
         var nm = (me0.cname || me0.name || 'Player').slice(0, 30);
-        rin.onfocus = function () { if (vt) { clearTimeout(vt); vt = null; } var vv = stv.querySelector('video'); if (vv) vv.pause(); };
-        rin.onblur = function () {
-          var vv = stv.querySelector('video');
-          if (vv) { var pr = vv.play(); if (pr && pr.catch) pr.catch(function () {}); return; }
-          if (!vt) vt = setTimeout(function () { idx++; draw(); }, sec * 1000);
-        };
+        rin.onfocus = function () { if (VC) VC.hold(); };
+        rin.onblur = function () { if (VC) VC.release(); };
         heart.onclick = function () {
           var liked = heart.textContent === '❤️';
           var rf = db.ref('statusReacts/' + x.uid + '/' + x.id + '/' + me0.uid);
@@ -559,35 +795,66 @@
         db.ref('statusReacts/' + x.uid + '/' + x.id).once('value').then(function (sn) {
           vb.textContent = '👁 ' + Object.keys(sn.val() || {}).length + '  •  ' + T.swipeUp;
         }).catch(function () {});
-        vb.onclick = function (e) { e.stopPropagation(); openViews(x, draw); };
-        stv.ontouchstart = function (e) { sy = e.touches[0].clientY; };
-        stv.ontouchend = function (e) {
-          if (stv.querySelector('.vpan')) return;
-          if (sy !== null && sy - e.changedTouches[0].clientY > 60) openViews(x, draw);
-          sy = null;
-        };
+        vb.onclick = function (e) { e.stopPropagation(); openViews(x); };
       }
-      if (x.ty !== 'video') vt = setTimeout(function () { idx++; draw(); }, sec * 1000);
+
+      function tick() {
+        if (my !== token) { stopT(); return; }
+        var frac;
+        if (vidEl) frac = Math.min(1, vidEl.currentTime / (x.d || vidEl.duration || 1));
+        else { if (!paused()) elapsed += 0.05 * rate; frac = Math.min(1, elapsed / dur); }
+        var bi = bars.children[idx] && bars.children[idx].firstChild;
+        if (bi) bi.style.width = (frac * 100) + '%';
+        if (!vidEl && frac >= 1) { stopT(); idx++; draw(); }
+      }
+
+      // media: nothing is shown while it comes (no "Loading" text); timer starts only when it is ready
+      var pm = (x.ty === 'photo' || x.ty === 'video') ? (x.im ? Promise.resolve(safeSrc(x.im)) : getBlob(x, 'c')) : Promise.resolve(null);
+      var pu = x.mn ? getBlob(x, 'm').catch(function () { return null; }) : Promise.resolve(null);
+      Promise.all([pm, pu]).then(function (r) {
+        if (my !== token) return;
+        var med = r[0], mus = r[1];
+        if (x.ty === 'text') {
+          var tx = x.tx || (x.mn ? '🎵 ' + (x.mnm || '') : '');
+          stage.appendChild(h('div', 'tx', tx));
+        } else if (x.ty === 'photo') {
+          var im = h('img');
+          im.onload = function () { if (im.naturalHeight / im.naturalWidth >= 1.6) im.style.objectFit = 'cover'; };
+          im.src = med; stage.appendChild(im);
+        } else {
+          var vd = h('video'); vd.setAttribute('playsinline', ''); vd.muted = !!mus;
+          vd.onloadedmetadata = function () { if (vd.videoHeight / vd.videoWidth >= 1.6) vd.style.objectFit = 'cover'; };
+          vd.onended = function () { if (my === token) { idx++; draw(); } };
+          vd.onerror = function () { if (my === token) { idx++; draw(); } };
+          vd.src = med; stage.appendChild(vd); vidEl = vd;
+        }
+        if (mus) { var au = new Audio(mus); au.loop = true; audEl = au; }
+        ready = true; sync();
+        prefetch(list[idx + 1]);
+        vt = setInterval(tick, 50);
+      }).catch(function () {
+        if (my !== token) return;
+        setTimeout(function () { if (my === token) { idx++; draw(); } }, 700);
+      });
     }
     draw();
   }
 
-  function openViews(x, onClose) {
-    if (vt) { clearTimeout(vt); vt = null; }
-    var vv0 = stv.querySelector('video'); if (vv0) vv0.pause();
+  // who viewed / who liked (own status only)
+  function openViews(x) {
+    if (VC) VC.hold();
     var pan = h('div', 'vpan'), hd = h('div', 'vhd');
     var ttl = h('b', '', T.viewedBy), cx = h('button', '', '✕'); cx.type = 'button';
     hd.appendChild(ttl); hd.appendChild(cx); pan.appendChild(hd);
-    var lst = h('div', 'vlist'); lst.appendChild(h('div', 'sempty', T.loading)); pan.appendChild(lst);
+    var lst = h('div', 'vlist'); pan.appendChild(lst);
     stv.appendChild(pan);
-    cx.onclick = function () { pan.remove(); if (onClose) onClose(); };
+    cx.onclick = function () { pan.remove(); if (VC) VC.release(); };
     var inbox = core().getInbox();
     db.ref('statusReacts/' + x.uid + '/' + x.id).once('value').then(function (sn) {
       var v = sn.val() || {};
       var arr = Object.keys(v).map(function (k) { var r = v[k]; r.uid = k; return r; });
       arr.sort(function (a, b) { return b.t - a.t; });
       ttl.textContent = T.viewedBy + ' ' + arr.length + '  •  ❤️ ' + arr.filter(function (r) { return r.l; }).length;
-      lst.innerHTML = '';
       if (!arr.length) { lst.appendChild(h('div', 'sempty', T.noViews)); return; }
       arr.forEach(function (r) {
         var ph = '';
@@ -599,8 +866,9 @@
         if (r.l) row.appendChild(h('span', 'vl', '❤️'));
         lst.appendChild(row);
       });
-    }).catch(function () { lst.innerHTML = ''; lst.appendChild(h('div', 'sempty', T.tryAgain)); });
+    }).catch(function () { lst.appendChild(h('div', 'sempty', T.tryAgain)); });
   }
+
 
   /* =================== SETTINGS =================== */
   function modal(title, build) {
@@ -651,7 +919,7 @@
   function renderSettings() {
     var C = core(), me = C && C.getMe();
     paneT.innerHTML = '';
-    if (!me) { paneT.appendChild(h('div', 'sempty', T.loading)); return; }
+    if (!me) return;
     var p = h('div', 'setp'); var big = h('div', 'big'); setAv(big, me.photo);
     var t = h('div'); t.appendChild(h('b', '', me.cname || me.name)); t.appendChild(h('span', '', 'ID: ' + me.pid));
     p.appendChild(big); p.appendChild(t); paneT.appendChild(p);

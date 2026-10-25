@@ -4,7 +4,7 @@ if (document.getElementById('searchForm') && window.firebase) {
 // chat.js - Settings > Chat : UID search, chat list (auto), text / emoji / photo, timers, menu
 
 var db = firebase.database();
-var MAX_TEXT = 50;
+var MAX_TEXT = 200;
 var PASS_MIN = 8, PASS_MAX = 16;   // password kam se kam 8, zyada se zyada 16 akshar
 var PHOTO_MS = 60000;      // photo: dekhne ke 60 sec baad delete
 var TS = firebase.database.ServerValue.TIMESTAMP;
