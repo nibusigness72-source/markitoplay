@@ -1,11 +1,10 @@
 // =====================================================================
-// status-stream.js  -  STREAMING version
-//  * video is ONE file (not cut). It starts after about 5 seconds are loaded,
-//    the rest keeps loading in the background while you watch.
-//  * if the net is slow it waits quietly (loader) and goes on after 3 seconds are ready.
-//  * if anything gets stuck, it downloads the whole video and continues from the same second.
-//  * video is recorded at max 1.2 Mbps so Firebase can deliver it fast enough.
-//  If this file gives trouble, use status-stream-full.js instead (rename it to status-stream.js).
+// status-stream.js  -  Status video: 5-second pieces + background loading
+//  * Upload side : video is cut into SEG_SEC (5 sec) independent pieces + a small thumbnail
+//  * Watch side  : first piece loads (about 5 sec of video) -> plays at once,
+//                  next pieces keep loading in the background while you watch.
+//                  If the next piece is not ready yet, a loader shows and it continues by itself.
+// Used by chat-status.js (window.StatusStream). No settings needed here.
 // =====================================================================
 (function () {
   'use strict';
@@ -35,10 +34,9 @@
     });
   }
 
-  /* ---------- upload side: video -> ONE continuous file (re-recorded) ---------- */
+  /* ---------- upload side: ONE continuous video (like a normal streaming file) ---------- */
   // o = { side, bps, thumbSide, thumbQ }.  Resolves { b64: base64 text (no header), mime, th }
-  function encodeReal(url, dur, o, onProg) {
-    o = { side: o.side, bps: Math.min(o.bps || 1200000, 1200000), thumbSide: o.thumbSide, thumbQ: o.thumbQ };
+  function encode(url, dur, o, onProg) {
     return new Promise(function (res, rej) {
       var MR = window.MediaRecorder;
       var mime = ['video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'].filter(function (m) {
@@ -68,7 +66,7 @@
         } catch (e) {}
         var chunks = [], th = '', dead = false, rec = null;
         function closeAc() { clearInterval(wake); if (ac) { try { ac.close(); } catch (e) {} ac = null; } }
-        try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: o.bps, audioBitsPerSecond: 64000 }); }
+        try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: o.bps, audioBitsPerSecond: 96000 }); }
         catch (e) { closeAc(); rej(new Error('norec')); return; }
         rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
         rec.onstop = function () {
@@ -113,13 +111,7 @@
     });
   }
 
-  // very old test statuses (video in 5-second pieces) are not supported any more: they are just skipped
-  function createPlayer(o) {
-    setTimeout(function () { if (o.onError) o.onError(); }, 0);
-    return { start: noop, play: noop, pause: noop, rate: noop, time: function () { return 0; }, dur: function () { return 1; }, destroy: noop };
-  }
-
-  /* ---------- watch side: STREAMING. One video; data is fed into it while it plays ---------- */
+  /* ---------- watch side (true streaming): one video, data is fed into it while it plays ---------- */
   function canStream(mime) {
     return !!(mime && window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(mime));
   }
@@ -131,60 +123,26 @@
     v.muted = !!o.muted; v.style.visibility = 'hidden';
     v.onloadedmetadata = function () { if (v.videoWidth && v.videoHeight / v.videoWidth >= 1.6) v.style.objectFit = 'cover'; };
     o.stage.appendChild(v);
-    var ms = new MediaSource(), url = URL.createObjectURL(ms), sb = null, blobUrl = null;
-    var dead = false, first = false, want = false, done = false, stalled = false, bailed = false;
+    var ms = new MediaSource(), url = URL.createObjectURL(ms), sb = null;
+    var dead = false, first = false, want = false, done = false, stalled = false;
     var got = {}, nextFetch = 0, nextAppend = 0, inflight = 0, AHEAD = o.ahead || 5, REBUF = 3;
 
     function bufEnd() { try { var b = v.buffered; return b.length ? b.end(b.length - 1) : 0; } catch (e) { return 0; } }
+    function fail() { if (!dead && o.onError) o.onError(); }
     function stall(b) { if (stalled === b) return; stalled = b; if (o.onStall) o.onStall(b); }
-    function tryPlay() { var p = v.play(); if (p && p.catch) p.catch(noop); }
-    function fail() {
-      if (dead || bailed) return;
-      if (first) bail(); else if (o.onError) o.onError();
-    }
-
-    // SAFETY NET: if streaming ever gets stuck, download the whole video and carry on from the same second
-    function loadAll() {
-      return new Promise(function (res, rej) {
-        var out = new Array(o.n), next = 0, left = o.n, bad = false;
-        function w() {
-          if (bad || next >= o.n) return;
-          var k = next++;
-          o.getChunk(k).then(function (b) { out[k] = b; if (--left === 0) res(out); else w(); })
-            .catch(function (e) { bad = true; rej(e); });
-        }
-        for (var z = 0; z < Math.min(4, o.n); z++) w();
-      });
-    }
-    function bail() {
-      if (dead || bailed) return;
-      bailed = true; stall(true);
-      var t = v.currentTime || 0;
-      loadAll().then(function (parts) {
-        if (dead) return;
-        blobUrl = URL.createObjectURL(new Blob(parts, { type: o.mime.split(';')[0] }));
-        v.onloadedmetadata = function () {
-          v.onloadedmetadata = null;
-          try { if (t > 0.5) v.currentTime = t; } catch (e) {}
-          stall(false); if (want) tryPlay();
-        };
-        v.src = blobUrl; v.load();
-      }).catch(function () { if (!dead && o.onError) o.onError(); });
-    }
-
     function fetchMore() {                       // keep loading chunks in order while watching
-      while (!dead && !bailed && inflight < 6 && nextFetch < o.n && nextFetch - nextAppend < 24) {
+      while (!dead && inflight < 6 && nextFetch < o.n && nextFetch - nextAppend < 24) {
         (function (j) {
           inflight++;
           o.getChunk(j).then(function (bytes) {
-            if (dead || bailed) return;
+            if (dead) return;
             got[j] = bytes; inflight--; append(); fetchMore();
           }).catch(function () { inflight--; fail(); });
         })(nextFetch++);
       }
     }
     function append() {
-      if (dead || bailed || !sb || sb.updating) return;
+      if (dead || !sb || sb.updating) return;
       if (got[nextAppend]) {
         var b = got[nextAppend]; delete got[nextAppend]; nextAppend++;
         try { sb.appendBuffer(b); } catch (e) { fail(); }
@@ -195,7 +153,7 @@
       }
     }
     function check() {                            // start as soon as ~5 seconds are ready
-      if (first || dead || bailed) return;
+      if (first || dead) return;
       var e = bufEnd();
       if (e >= AHEAD || (done && e > 0)) {
         first = true;
@@ -204,12 +162,6 @@
         if (o.onFirst) o.onFirst();
       }
     }
-    function jumpGap() {                          // small hole between two pieces of data: jump over it
-      try {
-        var b = v.buffered, ct = v.currentTime;
-        for (var k = 0; k < b.length; k++) if (b.start(k) > ct + 0.01) { v.currentTime = b.start(k) + 0.02; return; }
-      } catch (e) {}
-    }
     ms.addEventListener('sourceopen', function () {
       if (sb || dead) return;
       try { sb = ms.addSourceBuffer(o.mime); } catch (e) { fail(); return; }
@@ -217,30 +169,19 @@
       sb.addEventListener('error', fail);
       fetchMore();
     });
-
-    // watchdog every quarter second
-    var lastCT = -1, noMove = 0, lastEnd = 0, noGrow = 0;
+    // smooth like WhatsApp: when the data runs out, wait quietly until 3 seconds are ready, then go on (no stop-start jerks)
     var wd = setInterval(function () {
-      if (dead || bailed || !first || !want) { noMove = 0; return; }
-      var ct = v.currentTime, end = bufEnd(), ahead = end - ct;
-      // 1) data ran out: wait quietly until 3 seconds are ready, then go on
+      if (dead || !first || !want) return;
+      var ahead = bufEnd() - v.currentTime;
       if (!stalled) {
         if (!done && ahead < 0.4 && !v.paused) { v.pause(); stall(true); }
-        else if (v.paused && !v.ended) tryPlay();
-      } else if (done || ahead >= REBUF) { stall(false); tryPlay(); }
-      // 2) video not moving although it should
-      if (!stalled && !v.paused && !v.ended) {
-        noMove = Math.abs(ct - lastCT) < 0.01 ? noMove + 250 : 0;
-        if (noMove >= 1000 && ahead > 0.5) jumpGap();
-        if (noMove >= 5000) { bail(); return; }
-      } else noMove = 0;
-      lastCT = ct;
-      // 3) no new data for a long time: fall back to full download
-      if (end > lastEnd + 0.01) { lastEnd = end; noGrow = 0; } else noGrow += 250;
-      if (!done && noGrow >= 12000) bail();
+      } else if (done || ahead >= REBUF) {
+        stall(false);
+        var p = v.play(); if (p && p.catch) p.catch(noop);
+      }
     }, 250);
     v.onended = function () { if (!dead && o.onEnd) o.onEnd(); };
-    v.onerror = function () { fail(); };
+    v.onerror = fail;
 
     return {
       start: function () { v.src = url; },
@@ -250,13 +191,119 @@
       time: function () { return v.currentTime || 0; },
       dur: function () { return o.dur; },
       destroy: function () {
-        dead = true; clearInterval(wd); v.onended = v.onerror = v.onloadedmetadata = null;
+        dead = true; clearInterval(wd); v.onended = v.onerror = null;
         try { v.pause(); v.removeAttribute('src'); v.load(); } catch (x) {}
-        try { URL.revokeObjectURL(url); if (blobUrl) URL.revokeObjectURL(blobUrl); } catch (x) {}
+        try { URL.revokeObjectURL(url); } catch (x) {}
         if (v.parentNode) v.parentNode.removeChild(v);
       }
     };
   }
 
-  window.StatusStream = { encode: encodeReal, canStream: canStream, createMsePlayer: createMsePlayer, createPlayer: createPlayer, thumbOfVideo: thumbOfVideo, thumbOfImage: thumbOfImage, thumbOf: thumbOfVideo };
+  /* ---------- older style: video in separate pieces (kept so earlier statuses still play) ---------- */
+  // o = { stage, n, sd, muted, getSeg(k)->Promise<Blob>, onFirst, onEnd, onStall(bool), onError }
+  // returned object: start() play() pause() rate(r) time() dur() destroy()
+  function createPlayer(o) {
+    var vids = [mk(), mk()], urls = [], P = [], i = 0, dead = false, r = 1, want = false, first = false, stalled = false;
+
+    function mk() {
+      var e = document.createElement('video');
+      e.className = 'sv'; e.setAttribute('playsinline', ''); e.playsInline = true; e.preload = 'auto';
+      e.muted = !!o.muted; e.style.visibility = 'hidden';
+      e.onloadedmetadata = function () { if (e.videoWidth && e.videoHeight / e.videoWidth >= 1.6) e.style.objectFit = 'cover'; };
+      e.oncanplay = function () {
+        if (!first && !dead && e.getAttribute('data-k') === '0') { first = true; if (o.onFirst) o.onFirst(); }
+      };
+      e.onended = function () {
+        if (dead || e !== vids[i % 2]) return;
+        if (i + 1 >= o.n) { if (o.onEnd) o.onEnd(); } else enter(i + 1);
+      };
+      e.onerror = function () {
+        if (!dead && e === vids[i % 2] && e.getAttribute('data-k') === String(i)) fail();
+      };
+      o.stage.appendChild(e);
+      return e;
+    }
+    function fail() { if (!dead && o.onError) o.onError(); }
+    function stall(b) { if (stalled === b) return; stalled = b; if (o.onStall) o.onStall(b); }
+    function load(k) {
+      if (k >= o.n) return null;
+      if (!P[k]) {
+        P[k] = o.getSeg(k).then(function (b) {
+          if (dead) return null;
+          urls[k] = URL.createObjectURL(b); return urls[k];
+        });
+      }
+      return P[k];
+    }
+    function pump(k) {                       // keep loading the next piece while watching
+      var p = load(k); if (!p) return;
+      p.then(function () { if (!dead) pump(k + 1); }).catch(noop);
+    }
+    function tryPlay(e) { var p = e.play(); if (p && p.catch) p.catch(noop); }
+    // phones do not really load a hidden video until it has been played once: play it silently for a moment so the switch has no pause
+    function prime(e) {
+      e._pr = true; e.muted = true;
+      var p = e.play();
+      Promise.resolve(p).then(function () {
+        if (e._pr && !dead) { e.pause(); try { e.currentTime = 0; } catch (x) {} }
+      }).catch(noop).then(function () { e._pr = false; });
+    }
+    function prep(k) {                       // put the next piece in the hidden player, ready to go
+      var p = load(k); if (!p) return;
+      p.then(function (u) {
+        if (dead || !u || k === i) return;
+        var e = vids[k % 2];
+        if (e.getAttribute('data-k') !== String(k)) { e.src = u; e.setAttribute('data-k', String(k)); e.load(); prime(e); }
+      }).catch(noop);
+    }
+    function enter(k) {
+      i = k;
+      var e = vids[k % 2], p = load(k);
+      if (!urls[k]) stall(true);
+      p.then(function (u) {
+        if (dead || i !== k) return;
+        stall(false);
+        if (e.getAttribute('data-k') !== String(k)) { e.src = u; e.setAttribute('data-k', String(k)); }
+        e._pr = false; e.playbackRate = r; e.muted = !!o.muted;
+        e.style.visibility = 'visible'; vids[(k + 1) % 2].style.visibility = 'hidden';
+        if (want) tryPlay(e);
+        prep(k + 1);
+      }).catch(function () { if (!dead && i === k) fail(); });
+    }
+
+    // watchdog: if the video stops by itself (phone hiccup), push it again
+    var lastT = -1, stuck = 0;
+    var wd = setInterval(function () {
+      if (dead || !want || stalled) { lastT = -1; stuck = 0; return; }
+      var e = vids[i % 2];
+      if (e.getAttribute('data-k') !== String(i) || e._pr) return;
+      if (e.paused && !e.ended) { tryPlay(e); return; }
+      var t = e.currentTime;
+      if (!e.ended && Math.abs(t - lastT) < 0.01) {
+        stuck += 300;
+        if (stuck >= 1500) { stuck = 0; try { e.currentTime = t + 0.05; } catch (x) {} tryPlay(e); }
+      } else stuck = 0;
+      lastT = t;
+    }, 300);
+
+    return {
+      start: function () { pump(0); enter(0); },
+      play: function () { want = true; var e = vids[i % 2]; if (e.getAttribute('data-k') === String(i)) return e.play(); },
+      pause: function () { want = false; vids[i % 2].pause(); },
+      rate: function (x) { r = x; vids.forEach(function (e) { e.playbackRate = x; }); },
+      time: function () { return i * o.sd + (vids[i % 2].currentTime || 0); },
+      dur: function () { return o.n * o.sd; },
+      destroy: function () {
+        dead = true; clearInterval(wd);
+        vids.forEach(function (e) {
+          e.onended = e.onerror = e.oncanplay = null;
+          try { e.pause(); e.removeAttribute('src'); e.load(); } catch (x) {}
+          if (e.parentNode) e.parentNode.removeChild(e);
+        });
+        urls.forEach(function (u) { if (u) { try { URL.revokeObjectURL(u); } catch (x) {} } });
+      }
+    };
+  }
+
+  window.StatusStream = { encode: encode, canStream: canStream, createMsePlayer: createMsePlayer, createPlayer: createPlayer, thumbOfVideo: thumbOfVideo, thumbOfImage: thumbOfImage, thumbOf: thumbOfVideo };
 })();
