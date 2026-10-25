@@ -28,7 +28,7 @@
     SQUEEZE_MB: 5,              // videos bigger than this are re-encoded (made smaller) automatically
     RAW_MAX_MB: 20,             // only if re-encoding is not possible on the phone: biggest raw video allowed
     CHUNK: 150000,              // upload piece size (characters)
-    SEG_SEC: 30,                 // status video is cut into pieces of this many seconds (first piece loads, plays, rest loads while watching)
+    SEG_SEC: 5,                 // status video is cut into pieces of this many seconds (first piece loads, plays, rest loads while watching)
     THUMB_SIDE: 200,            // small preview picture shown while a status loads (pixels)
     THUMB_Q: 0.55,              // preview picture quality 0.1 - 1
     TEXT_COLORS: ['#ffffff', '#facc15', '#22d3ee', '#4ade80', '#f472b6', '#fb923c', '#a78bfa', '#111827'],   // text status colours (A button)
