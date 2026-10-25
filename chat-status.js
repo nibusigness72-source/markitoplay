@@ -24,7 +24,7 @@
     PHOTO_SIDE: 1080,           // max photo width/height in pixels
     PHOTO_QUALITY: 0.8,         // photo quality 0.1 - 1 (higher = clearer, bigger)
     VIDEO_SIDE: 854,            // video is re-encoded to this max width/height (higher = sharper, bigger)
-    VIDEO_BPS: 2600000,         // video bitrate when re-encoding (2.2 Mbps = about 8 MB for 30 sec). Lower = faster but blurrier
+    VIDEO_BPS: 2200000,         // video bitrate when re-encoding (2.2 Mbps = about 8 MB for 30 sec). Lower = faster but blurrier
     SQUEEZE_MB: 5,              // videos bigger than this are re-encoded (made smaller) automatically
     RAW_MAX_MB: 20,             // only if re-encoding is not possible on the phone: biggest raw video allowed
     CHUNK: 150000,              // upload piece size (characters)
