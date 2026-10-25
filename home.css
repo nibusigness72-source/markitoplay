@@ -353,3 +353,6 @@ body {
 
 .play-btn:active { transform: scale(0.96); }
 
+.hs-tabs{display:flex;gap:10px;margin-bottom:12px}
+.hs-tab{flex:1;text-align:center;margin-top:10px; margin-left: 10px; margin-right: 10px; padding:13px 8px;border-radius:18px;font-weight:800;font-size:17px;color:#cfe3ff;text-decoration:none;border:2px solid #1f3a8a;background:#0b1544}
+.hs-tab.g.on{color:#fff;border-color:#22d3ee;background:linear-gradient(135deg,#1d4ed8,#a855f7)}

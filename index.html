@@ -19,6 +19,13 @@
 </head>
 <body>
 
+  
+
+  <div class="hs-tabs">
+  <a class="hs-tab g on">🎮 GAMES</a>
+  <a class="hs-tab c" href="chat.html">💬 CHAT</a>
+  </div>
+
   <div class="app">
 
     <!-- Top Bar -->
@@ -54,6 +61,8 @@
         <span>Bonus : <b class="green">₹ 0.00</b></span>
       </div>
     </section>
+
+    
 
     <!-- Banner -->
     <section class="banner">
@@ -353,5 +362,65 @@
   <script src="skeleton.js"></script>
     <script src="whatsapp.js"></script>
   <script src="free-mode.js"></script>
+
+<!-- Firebase Cloud Messaging (Compat) Scripts -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js"></script>
+
+<script>
+  // 1. Service Worker रजिस्टर करें
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/firebase-messaging-sw.js')
+      .then((registration) => {
+        console.log('Service Worker Registered successfully:', registration);
+        requestPermission(registration);
+      })
+      .catch((err) => {
+        console.error('Service Worker registration failed:', err);
+      });
+  }
+
+  // 2. Notification Permission और FCM Token प्राप्त करना
+  function requestPermission(swRegistration) {
+    Notification.requestPermission().then((permission) => {
+      if (permission === 'granted') {
+        console.log('Notification permission granted.');
+        
+        // Firebase Messaging इन्स्टेंस लें
+        const messaging = firebase.messaging();
+
+        // सर्विस वर्कर रजिस्ट्रेशन पास करके FCM Token लें
+        messaging.getToken({ 
+          serviceWorkerRegistration: swRegistration,
+          vapidKey: "यहाँ_अपना_Web_Push_Certificate_Key_डालें" // अगर कंसोल में जनरेट किया है तो यहाँ डाल सकते हैं, वरना खाली भी छोड़ सकते हैं
+        })
+        .then((currentToken) => {
+          if (currentToken) {
+            console.log('FCM Device Token:', currentToken);
+            // इस टोकन को आप चाहें तो अपने डेटाबेस में सेव कर सकते हैं
+          } else {
+            console.log('No registration token available. Request permission to generate one.');
+          }
+        })
+        .catch((err) => {
+          console.error('An error occurred while retrieving token. ', err);
+        });
+
+      } else {
+        console.log('Unable to get permission to notify.');
+      }
+    });
+  }
+
+  // 3. जब यूज़र ऐप के अंदर (Foreground) हो, तब मैसेज हैंडल करना
+  if (firebase.messaging.isSupported()) {
+    const messaging = firebase.messaging();
+    messaging.onMessage((payload) => {
+      console.log('Foreground Message received: ', payload);
+      alert(`${payload.notification.title}\n${payload.notification.body}`);
+    });
+  }
+</script>
+
+  
 </body>
 </html>
