@@ -52,7 +52,7 @@
         var cv = document.createElement('canvas');
         cv.width = Math.max(2, Math.round(v.videoWidth * sc) & ~1); cv.height = Math.max(2, Math.round(v.videoHeight * sc) & ~1);
         if (!cv.captureStream) { rej(new Error('nocap')); return; }
-        var cx = cv.getContext('2d'), stream = cv.captureStream(24), ac = null;
+        var cx = cv.getContext('2d'), stream = cv.captureStream(30), ac = null, wake = null;
         try {
           var AC = window.AudioContext || window.webkitAudioContext;
           if (AC) {
@@ -61,14 +61,16 @@
             sn.connect(ad);
             ad.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
             if (ac.state === 'suspended') ac.resume();
+            // phones may put the audio engine to sleep: wake it again and again, otherwise the video is recorded without sound
+            wake = setInterval(function () { if (ac && ac.state !== 'running') ac.resume(); }, 250);
           }
         } catch (e) {}
 
         var blobs = [], started = 0, pending = 0, cur = null, th = '', segStart = 0, ended = false, dead = false;
-        function closeAc() { if (ac) { try { ac.close(); } catch (e) {} ac = null; } }
+        function closeAc() { clearInterval(wake); if (ac) { try { ac.close(); } catch (e) {} ac = null; } }
         function startRec() {
           var rec, ch = [], my = started;
-          try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: o.bps, audioBitsPerSecond: 64000 }); }
+          try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: o.bps, audioBitsPerSecond: 96000 }); }
           catch (e) { return null; }
           started++; pending++;
           rec.ondataavailable = function (e) { if (e.data && e.data.size) ch.push(e.data); };
@@ -104,7 +106,10 @@
             var nr = startRec();
             if (nr) { var old = cur; cur = nr; segStart = t; if (old.state !== 'inactive') old.stop(); }
           }
-          if (!v.ended) requestAnimationFrame(frame);
+          if (!v.ended) next();
+        }
+        function next() {
+          if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(frame); else requestAnimationFrame(frame);
         }
         v.onended = function () {
           ended = true;
@@ -166,12 +171,20 @@
       p.then(function () { if (!dead) pump(k + 1); }).catch(noop);
     }
     function tryPlay(e) { var p = e.play(); if (p && p.catch) p.catch(noop); }
+    // phones do not really load a hidden video until it has been played once: play it silently for a moment so the switch has no pause
+    function prime(e) {
+      e._pr = true; e.muted = true;
+      var p = e.play();
+      Promise.resolve(p).then(function () {
+        if (e._pr && !dead) { e.pause(); try { e.currentTime = 0; } catch (x) {} }
+      }).catch(noop).then(function () { e._pr = false; });
+    }
     function prep(k) {                       // put the next piece in the hidden player, ready to go
       var p = load(k); if (!p) return;
       p.then(function (u) {
         if (dead || !u || k === i) return;
         var e = vids[k % 2];
-        if (e.getAttribute('data-k') !== String(k)) { e.src = u; e.setAttribute('data-k', String(k)); }
+        if (e.getAttribute('data-k') !== String(k)) { e.src = u; e.setAttribute('data-k', String(k)); e.load(); prime(e); }
       }).catch(noop);
     }
     function enter(k) {
@@ -182,12 +195,27 @@
         if (dead || i !== k) return;
         stall(false);
         if (e.getAttribute('data-k') !== String(k)) { e.src = u; e.setAttribute('data-k', String(k)); }
-        e.playbackRate = r; e.muted = !!o.muted;
+        e._pr = false; e.playbackRate = r; e.muted = !!o.muted;
         e.style.visibility = 'visible'; vids[(k + 1) % 2].style.visibility = 'hidden';
         if (want) tryPlay(e);
         prep(k + 1);
       }).catch(function () { if (!dead && i === k) fail(); });
     }
+
+    // watchdog: if the video stops by itself (phone hiccup), push it again
+    var lastT = -1, stuck = 0;
+    var wd = setInterval(function () {
+      if (dead || !want || stalled) { lastT = -1; stuck = 0; return; }
+      var e = vids[i % 2];
+      if (e.getAttribute('data-k') !== String(i) || e._pr) return;
+      if (e.paused && !e.ended) { tryPlay(e); return; }
+      var t = e.currentTime;
+      if (!e.ended && Math.abs(t - lastT) < 0.01) {
+        stuck += 300;
+        if (stuck >= 1500) { stuck = 0; try { e.currentTime = t + 0.05; } catch (x) {} tryPlay(e); }
+      } else stuck = 0;
+      lastT = t;
+    }, 300);
 
     return {
       start: function () { pump(0); enter(0); },
@@ -197,7 +225,7 @@
       time: function () { return i * o.sd + (vids[i % 2].currentTime || 0); },
       dur: function () { return o.n * o.sd; },
       destroy: function () {
-        dead = true;
+        dead = true; clearInterval(wd);
         vids.forEach(function (e) {
           e.onended = e.onerror = e.oncanplay = null;
           try { e.pause(); e.removeAttribute('src'); e.load(); } catch (x) {}

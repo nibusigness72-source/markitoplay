@@ -23,8 +23,8 @@
     PHOTO_SEC: 6,               // seconds a photo status stays on screen
     PHOTO_SIDE: 1080,           // max photo width/height in pixels
     PHOTO_QUALITY: 0.8,         // photo quality 0.1 - 1 (higher = clearer, bigger)
-    VIDEO_SIDE: 640,            // big videos are re-encoded to this max width/height
-    VIDEO_BPS: 1000000,         // video bitrate when re-encoding (1 Mbps = about 4 MB for 30 sec)
+    VIDEO_SIDE: 854,            // video is re-encoded to this max width/height (higher = sharper, bigger)
+    VIDEO_BPS: 2200000,         // video bitrate when re-encoding (2.2 Mbps = about 8 MB for 30 sec). Lower = faster but blurrier
     SQUEEZE_MB: 5,              // videos bigger than this are re-encoded (made smaller) automatically
     RAW_MAX_MB: 20,             // only if re-encoding is not possible on the phone: biggest raw video allowed
     CHUNK: 150000,              // upload piece size (characters)
@@ -210,7 +210,7 @@
     '.sendld{position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;font-size:16px;font-weight:700;z-index:9}'
   ].join('\n');
   document.head.appendChild(st);
-  /* ---------------- Layout: tabs + panes + bottom bar ---------------- */
+/* ---------------- Layout: tabs + panes + bottom bar ---------------- */
   var sv = $('searchView');
   var oldHead = sv.querySelector('.header');
   var bell = $('bellBtn');
@@ -433,7 +433,6 @@ var myList = [], contacts = [];
     f.addEventListener('change', function () { var file = f.files[0]; f.remove(); if (file) cb(file); });
     f.click();
   }
-
   // Add status sheet (Text, Music, then phone gallery / camera)
   function addMenu() {
     if (myList.length >= CONFIG.STATUS_MAX) { alert(T.maxReached.replace('{n}', CONFIG.STATUS_MAX)); return; }
@@ -600,8 +599,7 @@ var myList = [], contacts = [];
     };
     setTimeout(function () { ta.focus(); }, 100);
   }
-
-  /* ----- photo / video: choose, prepare, then composer with Music and Text at top right ----- */
+/* ----- photo / video: choose, prepare, then composer with Music and Text at top right ----- */
   function preparePhoto(file) {
     var rd = new FileReader();
     rd.onload = function (e) {
@@ -694,7 +692,8 @@ var myList = [], contacts = [];
         .catch(function () { ld.off(); send.disabled = false; cap.disabled = false; alert(T.postFail); });
     };
   }
-/* ----- view status (full screen: tap = pause, hold = 2x, swipe left/right = next/back, swipe up = views) ----- */
+
+  /* ----- view status (full screen: tap = pause, hold = 2x, swipe left/right = next/back, swipe up = views) ----- */
   var stv = h('div', 'ov stv'); document.body.appendChild(stv);
   var vt = null, curCleanup = null;
   function stopT() { if (vt) { clearInterval(vt); vt = null; } }
@@ -844,8 +843,11 @@ var myList = [], contacts = [];
         vb.onclick = function (e) { e.stopPropagation(); openViews(x); };
       }
 
+      var tc = 0;
       function tick() {
         if (my !== token) { stopT(); return; }
+        // phone sometimes refuses to start the song the first time: try again every half second
+        if (audEl && ready && ++tc % 10 === 0 && !paused() && audEl.paused) play(audEl);
         var frac;
         if (vidEl) frac = Math.min(1, vidEl.time() / (x.d || vidEl.dur() || 1));
         else { if (!paused()) elapsed += 0.05 * rate; frac = Math.min(1, elapsed / dur); }
@@ -921,6 +923,7 @@ var myList = [], contacts = [];
     }
     draw();
   }
+
   // who viewed / who liked (own status only)
   function openViews(x) {
     if (VC) VC.hold();
