@@ -221,10 +221,10 @@
       bSent.classList.toggle('on', mode === 'sent');
       bKeep.classList.toggle('on', mode === 'keep');
       desc.textContent = mode === 'keep'
-        ? 'Permanent: message hamesha rahega, jab tak koi delete na kare. (Photo aur video par ye nahi chalta - wo dekhne ke baad delete ho jayenge.)'
+        ? 'Permanent: the message stays until someone deletes it. (Not available for photos and videos - they are deleted after viewing.)'
         : mode === 'sent'
-        ? 'Before seen: bhejte hi ' + fmtSec(sel) + ' ka timer chalu. Samne wale ne dekha ya nahi, ' + fmtSec(sel) + ' baad message gayab.'
-        : 'After seen: samne wala message dekhega tab ' + fmtSec(sel) + ' ka timer chalu hoga, phir gayab.';
+        ? 'Before seen: the ' + fmtSec(sel) + ' timer starts as soon as you send. The message disappears after ' + fmtSec(sel) + ' whether it was seen or not.'
+        : 'After seen: the ' + fmtSec(sel) + ' timer starts when the other person opens the message, then it disappears.';
     }
     function go(n) { sel = n; wheel.scrollTop = (n - 1) * ROW; paint(); }
 
@@ -241,9 +241,9 @@
     bSent.addEventListener('click', function () { mode = 'sent'; paint(); });
     bKeep.addEventListener('click', function () { mode = 'keep'; paint(); });
 
-    var ok = h('button', 'sheet-btn', '\u2705 Timer set karo'); ok.type = 'button';
+    var ok = h('button', 'sheet-btn', '\u2705 Set timer'); ok.type = 'button';
     ok.addEventListener('click', function () { saveCfg({ sec: sel, mode: mode }); closeSheet(); });
-    var auto = h('button', 'sheet-btn', '\u267B Auto (default) par wapas'); auto.type = 'button';
+    var auto = h('button', 'sheet-btn', '\u267B Back to Auto (default)'); auto.type = 'button';
     auto.addEventListener('click', function () { saveCfg(null); closeSheet(); });
     var cn = h('button', 'sheet-btn cancel', 'Cancel'); cn.type = 'button';
     cn.addEventListener('click', closeSheet);
@@ -256,7 +256,7 @@
  /* =================================================================
      3) VIDEO + FILE
      ================================================================= */
-  var V = null;                                       // full screen viewer
+  var V = null;    
   var vs = { key: null, url: null, tick: null, token: 0, video: null };
 
   function ensureViewer() {
@@ -333,24 +333,24 @@
     var m = C.getMsgs()[key];
     if (!m || m.mine) return;
     var d = m.d;
-    if (!(d.nc >= 1 && d.nc <= MAX_CHUNKS && d.nc % 1 === 0)) { alert('Ye file kharab hai'); return; }
+    if (!(d.nc >= 1 && d.nc <= MAX_CHUNKS && d.nc % 1 === 0)) { alert('This file is corrupted'); return; }
     closeViewer();
     var v = ensureViewer();
     var token = ++vs.token;
     vs.key = key;
     v._b.innerHTML = ''; v._t.textContent = '';
-    var status = h('div', 'adv-status', '\u23EC Load ho raha hai... 0%');
+    var status = h('div', 'adv-status', '\u23EC Loading... 0%');
     v._b.appendChild(status);
     v.style.display = 'flex';
 
     fetchBlob(C, key, d, function (p) {
-      if (vs.token === token) status.textContent = '\u23EC Load ho raha hai... ' + p + '%';
+      if (vs.token === token) status.textContent = '\u23EC Loading... ' + p + '%';
     }).then(function (blob) {
       if (vs.token !== token) return;
       if (d.type === 'video') playVideo(C, key, d, blob, v); else showFile(C, key, d, blob, v);
     }).catch(function (err) {
       if (vs.token !== token) return;
-      status.textContent = '\u274C ' + (err && err.message === 'gone' ? 'File ab available nahi hai' : 'Load nahi hua, dobara try karo');
+      status.textContent = '\u274C ' + (err && err.message === 'gone' ? 'File is no longer available' : 'Could not load. Please try again.');
     });
   }
 
@@ -377,7 +377,7 @@
     });
     vid.addEventListener('error', function () {
       v._b.innerHTML = '';
-      v._b.appendChild(h('div', 'adv-status', '\u274C Ye video is phone par chal nahi raha'));
+      v._b.appendChild(h('div', 'adv-status', '\u274C This video cannot be played on this phone'));
     });
     v._b.appendChild(vid);
     vs.video = vid;
@@ -401,13 +401,13 @@
     v._b.appendChild(h('div', 'advic big', '\uD83D\uDCC4'));
     v._b.appendChild(h('div', 'advname', name));
     v._b.appendChild(h('div', 'advmeta', fmtSize(d.sz)));
-    var a = h('a', 'adv-dl', '\u2B07 Save karo');
+    var a = h('a', 'adv-dl', '\u2B07 Save');
     a.href = url; a.download = name;
     v._b.appendChild(a);
-    var note = h('div', 'adv-note', '\u23F3 Server se delete ho rahi hai...');
+    var note = h('div', 'adv-note', '\u23F3 Being deleted from the server...');
     v._b.appendChild(note);
     if (d.mode === 'keep') {                    // permanent file: delete nahi karni
-      note.textContent = '\u267E Ye file permanent hai, server par rahegi.';
+      note.textContent = '\u267E This file is permanent and will stay on the server.';
       return;
     }
 
@@ -415,13 +415,13 @@
     var ref = C.getMsgRef(), m = C.getMsgs()[key];
     var p = (m && m.d.seenAt) ? Promise.resolve() : ref.child(key + '/seenAt').set(C.TS);
     p.then(function () { return ref.child(key).remove(); }).then(function () {
-      note.textContent = '\u2705 Server se delete ho gayi. Screen band karte hi ye yahan se bhi chali jayegi, abhi Save kar lo.';
+      note.textContent = '\u2705 Deleted from the server. It will also disappear from here once you close this screen - save it now.';
     }).catch(function () {
-      note.textContent = '\u26A0\uFE0F Server se delete nahi hui, thodi der mein apne aap hat jayegi.';
+      note.textContent = '\u26A0\uFE0F Could not delete from the server. It will be removed automatically shortly.';
     });
   }
 
-    // chat.js ke buildMessage se bulaya jata hai (type video / file)
+  // chat.js ke buildMessage se bulaya jata hai (type video / file)
   function buildMedia(key, d, m, box) {
     var isV = d.type === 'video';
     var card = h('div', 'advcard');
@@ -429,13 +429,12 @@
     var info = h('div', '');
     info.appendChild(h('div', 'advname', safeName(d.fn)));
     info.appendChild(h('div', 'advmeta', (isV ? 'Video \u2022 ' + fmtDur(d.dur) + ' \u2022 ' : 'File \u2022 ') + fmtSize(d.sz)));
-    info.appendChild(h('div', 'advhint', m.mine ? '\uD83D\uDCE4 Bheja gaya' : (isV ? '\u25B6 Tap to watch' : '\uD83D\uDC41 Tap to open (sirf 1 baar)')));
+    info.appendChild(h('div', 'advhint', m.mine ? '\uD83D\uDCE4 Sent' : (isV ? '\u25B6 Tap to watch' : '\uD83D\uDC41 Tap to open (one time only)')));
     card.appendChild(info);
     if (!m.mine) card.addEventListener('click', function (e) { e.stopPropagation(); openMedia(key); });
     box.appendChild(card);
     m.media = card;
   }
-
   // chat.js ke child_removed se bulaya jata hai
   function onRemoved(key, d) {
     if (!d || (d.type !== 'video' && d.type !== 'file')) return;
@@ -488,16 +487,16 @@
 
   function sendMedia(f) {
     var C = core();
-    if (!C || !C.getRoom() || !C.getPeer()) { alert('Pehle koi chat kholo'); return; }
-    if (sending) { alert('Pehli file abhi ja rahi hai, ruko'); return; }
-    if (BLOCKED.test(f.name || '')) { alert('Is type ki file allowed nahi hai'); return; }
-    if (!f.size) { alert('File khali hai'); return; }
-    if (f.size > MAX_BYTES) { alert('File ' + (MAX_BYTES / 1048576) + ' MB se chhoti honi chahiye'); return; }
+    if (!C || !C.getRoom() || !C.getPeer()) { alert('Please open a chat first'); return; }
+    if (sending) { alert('The first file is still uploading. Please wait.'); return; }
+    if (BLOCKED.test(f.name || '')) { alert('This file type is not allowed'); return; }
+    if (!f.size) { alert('The file is empty'); return; }
+    if (f.size > MAX_BYTES) { alert('File must be smaller than ' + (MAX_BYTES / 1048576) + ' MB'); return; }
 
     var ref = C.getMsgRef(), room = C.getRoom(), me = C.getMe();
     var advCfg = take();                       // timer sirf is ek bhejne ke liye
     var name = safeName(f.name);
-    var prog = h('div', 'msg mine adv-up', '\u2B06\uFE0F ' + name + ' taiyaar ho rahi hai...');
+    var prog = h('div', 'msg mine adv-up', '\u2B06\uFE0F ' + name + ' is being prepared...');
     var list = $('messages');
     list.appendChild(prog); list.scrollTop = list.scrollHeight;
     sending = true;
@@ -524,7 +523,7 @@
       if (C.getRoom() === room && C.getPeer()) C.touchPeer();
     }).catch(function () {
       if (base) C.db.ref(base).remove().catch(noop);
-      alert('Bhej nahi paye, dobara try karo');
+      alert('Could not send. Please try again.');
     }).then(function () {
       sending = false;
       if (prog.parentNode) prog.parentNode.removeChild(prog);

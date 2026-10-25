@@ -109,7 +109,7 @@ firebase.auth().onAuthStateChanged(function (user) {
   db.ref('users/' + user.uid).once('value').then(function (snap) {
     var d = snap.val() || {};
     if (!d.playerId) {
-      showMsg('Pehle Home page kholo, tumhara ID ban jayega', true);
+      showMsg('Please open the Home page first so your ID can be created', true);
       return;
     }
     me = { uid: user.uid, pid: String(d.playerId), name: d.name || 'Player', photo: d.photo || '' };
@@ -127,19 +127,19 @@ firebase.auth().onAuthStateChanged(function (user) {
       }
     });
   }).catch(function () {
-    showMsg('Data nahi aaya. Database Rules check karo.', true);
+    showMsg('Could not load data. Please check your Database Rules.', true);
   });
 });
 
 /* ---------- Search ---------- */
 function findUser(pid, ok, fail) {
-  if (pid === me.pid) { fail('Ye tumhara apna UID hai'); return; }
+  if (pid === me.pid) { fail('This is your own ID'); return; }
   db.ref('playerIds/' + pid).once('value').then(function (snap) {
     var d = snap.val();
-    if (!d) { fail('Ye UID nahi mila'); return; }
-    if (d.uid === me.uid) { fail('Ye tumhara apna UID hai'); return; }
+    if (!d) { fail('This ID was not found'); return; }
+    if (d.uid === me.uid) { fail('This is your own ID'); return; }
     ok({ uid: d.uid, pid: pid, name: d.u || d.n || 'Player', photo: d.p || '' });
-  }).catch(function () { fail('Search nahi hua, dobara try karo'); });
+  }).catch(function () { fail('Search failed. Please try again.'); });
 }
 
 /* ---------- Chat Lock: Username + Password (theek 8 akshar) ---------- */
@@ -178,13 +178,13 @@ function checkName() {
   var v = $('lkName').value.trim().toLowerCase();
   nameOk = false; clearTimeout(nameTimer);
   if (!v) { nameBad(''); return; }
-  if (!/^[a-z0-9_]{3,16}$/.test(v)) { nameBad('Username 3 se 16 akshar ka ho, sirf a-z, 0-9 aur _'); return; }
+  if (!/^[a-z0-9_]{3,16}$/.test(v)) { nameBad('Username must be 3 to 16 characters: only a-z, 0-9 and _'); return; }
   nameTimer = setTimeout(function () {
     db.ref('chatNames/' + v).once('value').then(function (s) {
       if ($('lkName').value.trim().toLowerCase() !== v) return;
       if (s.exists()) { nameBad('This username already exists.'); showSug(); }
       else { nameBad(''); nameOk = true; }
-    }).catch(function () { nameBad('Check nahi hua, dobara try karo'); });
+    }).catch(function () { nameBad('Could not check. Please try again.'); });
   }, 350);
 }
 function lockUI(mode) {
@@ -194,7 +194,7 @@ function lockUI(mode) {
   $('lkWho').style.display = create ? 'none' : 'block';
   if (!create && lockAuth) $('lkWho').textContent = '👤 ' + lockAuth.u;
   $('pwLabel').textContent = mode === 'reset' ? '🔒 Naya Password' : '🔒 Password';
-  $('lkGo').textContent = create ? 'Chat shuru karo' : (mode === 'reset' ? 'Naya password save karo' : 'Unlock');
+  $('lkGo').textContent = create ? 'Start chat' : (mode === 'reset' ? 'Save new password' : 'Unlock');
   $('forgotBox').style.display = mode === 'unlock' ? 'flex' : 'none';
   $('lkGen').style.display = mode === 'unlock' ? 'none' : '';
   $('lkPass').value = ''; $('pwCount').textContent = '0/' + PASS_MAX; lkMsg('');
@@ -219,7 +219,7 @@ function gate(cb) {
     $('lockView').style.display = 'block';
     lockUI(lockAuth ? 'unlock' : 'create');
     if (!lockAuth) { $('lkName').value = ''; showSug(); }
-  }).catch(function () { showMsg('Chat lock check nahi hua. Database Rules check karo.', true); });
+  }).catch(function () { showMsg('Could not verify chat lock. Please check your Database Rules.', true); });
 }
 (function () {
   $('lkPass').maxLength = PASS_MAX;
@@ -234,38 +234,38 @@ $('lkEye').addEventListener('click', function () { var p = $('lkPass'); p.type =
 $('lkGen').addEventListener('click', function () {
   var pw = genPass(), p = $('lkPass'); p.value = pw; p.type = 'text'; $('pwCount').textContent = PASS_MAX + '/' + PASS_MAX;
   try { navigator.clipboard.writeText(pw); } catch (e) {}
-  lkMsg('Ye password copy ho gaya. Kahin surakshit likh lo, dobara nahi dikhega.');
+  lkMsg('Password copied. Store it somewhere safe - it will not be shown again.');
 });
 $('lkReset').addEventListener('click', function () {
   lockUI('reset');
-  lkMsg('Aap apne account se login ho, isliye naya ' + PASS_MIN + ' se ' + PASS_MAX + ' akshar ka password bana sakte ho.');
+  lkMsg('You are signed in to your account, so you can set a new password of ' + PASS_MIN + ' to ' + PASS_MAX + ' characters.');
 });
 $('lkGo').addEventListener('click', function () {
   var pw = $('lkPass').value;
-  if (charCount(pw) < PASS_MIN || charCount(pw) > PASS_MAX) { lkMsg('Password ' + PASS_MIN + ' se ' + PASS_MAX + ' akshar ka hona chahiye (abhi ' + charCount(pw) + ')', true); return; }
-  var fail = function (e) { lkMsg(e && e.message === 'secure' ? 'Secure (https) connection chahiye' : 'Nahi hua, dobara try karo', true); };
+  if (charCount(pw) < PASS_MIN || charCount(pw) > PASS_MAX) { lkMsg('Password must be ' + PASS_MIN + ' to ' + PASS_MAX + ' characters (now ' + charCount(pw) + ')', true); return; }
+  var fail = function (e) { lkMsg(e && e.message === 'secure' ? 'A secure (https) connection is required' : 'Something went wrong. Please try again.', true); };
   lkMsg('Ruko...');
   if (lockMode === 'unlock') {
     sha(lockAuth.s + ':' + pw).then(function (h) {
-      if (h !== lockAuth.h) { lkMsg('Password galat hai', true); return; }
+      if (h !== lockAuth.h) { lkMsg('Incorrect password', true); return; }
       unlocked();
     }).catch(fail);
   } else if (lockMode === 'reset') {
-    if (!confirm('Naya password set karna hai? Purana password band ho jayega.')) { lkMsg(''); return; }
+    if (!confirm('Set a new password? Your old password will stop working.')) { lkMsg(''); return; }
     var s1 = rhex(12);
     sha(s1 + ':' + pw).then(function (h) {
       return db.ref('chatAuth/' + me.uid).set({ h: h, s: s1, u: lockAuth.u }).then(function () { lockAuth = { h: h, s: s1, u: lockAuth.u }; unlocked(); });
     }).catch(fail);
   } else {
     var u = $('lkName').value.trim().toLowerCase();
-    if (!nameOk) { lkMsg('Pehle sahi Username chuno', true); return; }
+    if (!nameOk) { lkMsg('Please choose a valid username first', true); return; }
     var s2 = rhex(12);
     sha(s2 + ':' + pw).then(function (h) {
       var up = {};
       up['chatNames/' + u] = { uid: me.uid, pid: me.pid };
       up['chatAuth/' + me.uid] = { h: h, s: s2, u: u };
       return db.ref().update(up).then(function () { lockAuth = { h: h, s: s2, u: u }; unlocked(); }, function () {
-        nameOk = false; nameBad('This username already exists.'); showSug(); lkMsg('Save nahi hua', true);
+        nameOk = false; nameBad('This username already exists.'); showSug(); lkMsg('Could not save', true);
       });
     }).catch(fail);
   }
@@ -284,7 +284,7 @@ function showFound(p) {
 
 $('searchForm').addEventListener('submit', function (e) {
   e.preventDefault();
-  if (!me) { showMsg('Thoda ruko, loading...', true); return; }
+  if (!me) { showMsg('Please wait, loading...', true); return; }
   var raw = $('uidInput').value.trim();
   $('resultBox').innerHTML = '';
   if (/^[0-9]{10,12}$/.test(raw)) {                                           // Player ID se
@@ -294,11 +294,11 @@ $('searchForm').addEventListener('submit', function (e) {
     showMsg('Dhundh rahe hain...');
     db.ref('chatNames/' + raw.toLowerCase()).once('value').then(function (s) {
       var d = s.val();
-      if (!d) { showMsg('Ye username nahi mila', true); return; }
+      if (!d) { showMsg('Username not found', true); return; }
       findUser(String(d.pid), showFound, function (m) { showMsg(m, true); });
-    }).catch(function () { showMsg('Search nahi hua, dobara try karo', true); });
+    }).catch(function () { showMsg('Search failed. Please try again.', true); });
   } else {
-    showMsg('UID (10 se 12 ank) ya Username (3 se 16 akshar) likho', true);
+    showMsg('Enter a User ID (10-12 digits) or a username (3-16 characters)', true);
   }
 });
 
@@ -371,9 +371,9 @@ function renderList() {
       onMenu: function () {
         openSheet(p.nick || p.name, [
           { label: '✏️ Naam badlo', fn: function () { editNick(room, p.nick); } },
-          { label: '🗑 Delete chat (list se hatao)', danger: true, fn: function () {
-            if (confirm('Is chat ko list se hatayein?')) {
-              db.ref('userChats/' + me.uid + '/' + room).remove().catch(function () { alert('Delete nahi hua'); });
+          { label: '🗑 Delete chat (remove from list)', danger: true, fn: function () {
+            if (confirm('Remove this chat from your list?')) {
+              db.ref('userChats/' + me.uid + '/' + room).remove().catch(function () { alert('Could not delete'); });
             }
           }}
         ]);
@@ -383,12 +383,12 @@ function renderList() {
 }
 
 function editNick(room, current) {
-  var v = prompt('Is contact ka naam likho (khali chhodo = asli naam)', current || '');
+  var v = prompt('Enter a name for this contact (leave empty to use the original name)', current || '');
   if (v === null) return;
   v = v.trim();
   if (v.length > 20) { alert('Naam 20 akshar tak rakho'); return; }
   var ref = db.ref('userChats/' + me.uid + '/' + room + '/nick');
-  (v ? ref.set(v) : ref.remove()).catch(function () { alert('Naam save nahi hua'); });
+  (v ? ref.set(v) : ref.remove()).catch(function () { alert('Could not save the name'); });
 }
 /* ---------- Chat window ---------- */
 var msgs = {};          // key -> { d, box, ... }
@@ -397,14 +397,13 @@ var tick = null;
 var started = false;
 var editingKey = null;
 var viewingKey = null;
-
-function updateHeader() {
+  function updateHeader() {
   $('peerName').textContent = peer.nick || peer.name;
 }
 
 function openChat(p) {
   if (!me || p.uid === me.uid) {
-    showMsg('Apne aap se chat nahi ho sakti', true);
+    showMsg('You cannot chat with yourself', true);
     return;
   }
   peer = p;
@@ -451,7 +450,7 @@ function markRead() {
   db.ref('userChats/' + me.uid + '/' + roomId + '/r').set(TS).catch(function () {});
 }
 
-// Message bhejne ke baad samne wale ki list mein chat dikhao (NEW)
+// Message after sending samne wale ki list mein chat dikhao (NEW)
 function touchPeer() {
   db.ref('userChats/' + peer.uid + '/' + roomId).update({
     uid: me.uid, pid: me.pid, n: me.cname || me.name, p: cleanP(me.photo), t: TS
@@ -653,12 +652,12 @@ function openMenu(key) {
     rows.push({ label: '✏️ Edit message', fn: function () { startEdit(key); } });
   }
   rows.push({ label: '🗑 Delete for me', fn: function () {
-    hiddenRef.child(key).set(true).catch(function () { alert('Delete nahi hua'); });
+    hiddenRef.child(key).set(true).catch(function () { alert('Could not delete'); });
   }});
   if (m.mine) {
     rows.push({ label: '🗑 Delete for everyone', danger: true, fn: function () {
-      if (confirm('Dono taraf se delete karein?')) {
-        msgRef.child(key).remove().catch(function () { alert('Delete nahi hua'); });
+      if (confirm('Delete for everyone?')) {
+        msgRef.child(key).remove().catch(function () { alert('Could not delete'); });
       }
     }});
   }
@@ -669,16 +668,17 @@ function showDetails(key) {
   var m = msgs[key], d = m.d;
   var rows = [
     { text: 'Type: ' + (d.type === 'photo' ? 'Photo' : 'Text') },
-    { text: 'Bheja gaya: ' + fullDate(d.t) },
-    { text: 'Dekha gaya: ' + (d.seenAt ? fullDate(d.seenAt) : 'Abhi nahi dekha') },
-    { text: 'Delete timer: ' + (d.mode === 'keep' ? 'Permanent' : ((d.dur || 0) / 1000) + ' second (' + (d.mode === 'sent' ? 'bhejne ke baad' : 'dekhne ke baad') + ')') },
-    { text: 'Delete hoga: ' + (d.mode === 'keep' ? 'Jab tak koi delete na kare' : (d.mode === 'sent' ? fullDate(d.t + d.dur) : (d.seenAt && d.dur ? fullDate(d.seenAt + d.dur) : 'Dekhne ke baad'))) }
+    { text: 'Sent: ' + fullDate(d.t) },
+    { text: 'Seen: ' + (d.seenAt ? fullDate(d.seenAt) : 'Not seen yet') },
+    { text: 'Delete timer: ' + (d.mode === 'keep' ? 'Permanent' : ((d.dur || 0) / 1000) + ' seconds (' + (d.mode === 'sent' ? 'after sending' : 'after seen') + ')') },
+    { text: 'Deletes at: ' + (d.mode === 'keep' ? 'Until someone deletes it' : (d.mode === 'sent' ? fullDate(d.t + d.dur) : (d.seenAt && d.dur ? fullDate(d.seenAt + d.dur) : 'After it is seen'))) }
   ];
   if (d.type === 'text') rows.splice(1, 0, { text: 'Lambai: ' + charCount(d.text || '') + ' / ' + MAX_TEXT + ' character' });
-  if (d.edited) rows.push({ text: 'Ye message edit hua hai' });
+  if (d.edited) rows.push({ text: 'This message was edited' });
   openSheet('Message Details', rows);
 }
-  /* ---------- Edit ---------- */
+
+/* ---------- Edit ---------- */
 function startEdit(key) {
   editingKey = key;
   input.value = msgs[key].d.text || '';
@@ -722,7 +722,7 @@ function sendText(adv) {
     var key = editingKey;
     cancelEdit();
     msgRef.child(key).update({ text: text, dur: dur, edited: true, mode: advMode })
-      .catch(function () { alert('Edit nahi hua. Shayad samne wale ne dekh liya.'); });
+      .catch(function () { alert('Could not edit. The other person may have already seen it.'); });
     return;
   }
 
@@ -732,7 +732,7 @@ function sendText(adv) {
   if (advMode) out.mode = advMode;
   msgRef.push(out)
     .then(touchPeer)
-    .catch(function () { alert('Message nahi gaya, dobara try karo'); });
+    .catch(function () { alert('Message not sent. Please try again.'); });
 }
 
 // Send button: photo (agar chuni hai) + text, dono ek saath. Timer sirf isi bar ke liye lagta hai.
@@ -819,7 +819,7 @@ function showPhoto(url) {
     photoPrev = el('div', 'photo-prev');
     prevImg = el('img');
     photoPrev.appendChild(prevImg);
-    photoPrev.appendChild(el('span', '', '📷 Photo ready - chahiye to ⏱ timer lagao, phir ➤ dabao'));
+    photoPrev.appendChild(el('span', '', '📷 Photo ready - set a ⏱ timer if you want, then tap ➤'));
     var x = el('button', '', '✖');
     x.addEventListener('click', clearPhoto);
     photoPrev.appendChild(x);
@@ -838,14 +838,14 @@ function sendPhoto(adv) {
   if (sel) { if (sel.dur) out.dur = sel.dur; if (sel.mode) out.mode = sel.mode; }
   msgRef.push(out)
     .then(touchPeer)
-    .catch(function () { alert('Photo nahi gayi, dobara try karo'); });
+    .catch(function () { alert('Photo not sent. Please try again.'); });
 }
 
 $('photoPick').addEventListener('change', function () {
   var file = this.files[0];
   this.value = '';
   if (!file || !msgRef) return;
-  if (file.type.indexOf('image/') !== 0) { alert('Sirf photo chuno'); return; }
+  if (file.type.indexOf('image/') !== 0) { alert('Please choose a photo only'); return; }
   resizeForChat(file, 600, showPhoto);
 });
 
@@ -857,8 +857,8 @@ function bellState() {
 }
 $('bellBtn').addEventListener('click', function () {
   if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') { alert('Notification pehle se ON hai'); return; }
-  if (Notification.permission === 'denied') { alert('Browser settings mein is site ka Notification Allow karo'); return; }
+  if (Notification.permission === 'granted') { alert('Notifications are already ON'); return; }
+  if (Notification.permission === 'denied') { alert('Please allow Notifications for this site in your browser settings'); return; }
   Notification.requestPermission().then(bellState);
 });
 bellState();
@@ -870,7 +870,9 @@ window.ChatCore = {
   getPeer: function () { return peer; },
   getRoom: function () { return roomId; },
   getMsgRef: function () { return msgRef; },
-  getMsgs: function () { return msgs; }
+  getMsgs: function () { return msgs; },
+  getInbox: function () { return inbox; },
+  pass: { min: PASS_MIN, max: PASS_MAX }
 };
 
 })();
@@ -929,8 +931,8 @@ window.ChatCore = {
 
     var name = e.nick || e.n || 'Player';
     var url = 'chat.html?pid=' + e.pid;
-    if (document.hidden) systemNotify('💬 ' + name, 'Naya message aaya hai', url, room);
-    else toast('💬 ' + name, 'Naya message aaya hai', url);
+    if (document.hidden) systemNotify('💬 ' + name, 'You have a new message', url, room);
+    else toast('💬 ' + name, 'You have a new message', url);
   }
 
   firebase.auth().onAuthStateChanged(function (u) {
@@ -958,8 +960,8 @@ window.ChatCore = {
         first = false;
         if (unread > 0 && !IS_CHAT_PAGE && !sessionStorage.getItem('chatToastShown')) {
           try { sessionStorage.setItem('chatToastShown', '1'); } catch (e) {}
-          toast('💬 ' + unread + ' naya chat message',
-                unread === 1 ? (lastUnread.nick || lastUnread.n || 'Player') : 'Chat kholo',
+          toast('💬 ' + unread + ' new chat message',
+                unread === 1 ? (lastUnread.nick || lastUnread.n || 'Player') : 'Open chat',
                 'chat.html');
         }
       }
