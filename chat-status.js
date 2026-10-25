@@ -19,8 +19,8 @@
     CAP_MAX: 100,               // max characters in a photo/video caption
     REPLY_MAX: 75,              // max characters in status reply (chat message limit is 100)
     MAX_SEC: 30,                // MAX seconds for video and for music clip (only limit, no MB limit)
-    TEXT_SEC: 5,                // seconds a text status stays on screen
-    PHOTO_SEC: 6,               // seconds a photo status stays on screen
+    TEXT_SEC: 30,                // seconds a text status stays on screen
+    PHOTO_SEC: 30,               // seconds a photo status stays on screen
     PHOTO_SIDE: 1080,           // max photo width/height in pixels
     PHOTO_QUALITY: 0.8,         // photo quality 0.1 - 1 (higher = clearer, bigger)
     VIDEO_SIDE: 854,            // video is re-encoded to this max width/height (higher = sharper, bigger)
@@ -210,7 +210,7 @@
     '.sendld{position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;font-size:16px;font-weight:700;z-index:9}'
   ].join('\n');
   document.head.appendChild(st);
-/* ---------------- Layout: tabs + panes + bottom bar ---------------- */
+  /* ---------------- Layout: tabs + panes + bottom bar ---------------- */
   var sv = $('searchView');
   var oldHead = sv.querySelector('.header');
   var bell = $('bellBtn');
@@ -313,6 +313,36 @@ var myList = [], contacts = [];
       bcache[key] = src; return src;
     });
   }
+  // streaming video: the file is stored as plain base64 chunks (statusBlobs/uid/sid/c/<n>); every chunk decodes on its own
+  var ccache = {};
+  function getChunkBytes(x, j) {
+    var key = x.id + 'k' + j;
+    if (ccache[key]) return ccache[key];
+    ccache[key] = db.ref('statusBlobs/' + x.uid + '/' + x.id + '/c/' + j).once('value').then(function (s) {
+      var v = s.val();
+      if (typeof v !== 'string') throw new Error('missing');
+      var bin = atob(v), n = bin.length, bytes = new Uint8Array(n);
+      for (var q = 0; q < n; q++) bytes[q] = bin.charCodeAt(q);
+      return bytes;
+    }).catch(function (e) { delete ccache[key]; throw e; });
+    return ccache[key];
+  }
+  // phone cannot stream: download everything, then play (still works, just waits)
+  function getStreamBlob(x) {
+    var out = new Array(x.nc), next = 0;
+    return new Promise(function (res, rej) {
+      var fail = false, left = x.nc;
+      function w() {
+        if (fail || next >= x.nc) return;
+        var k = next++;
+        getChunkBytes(x, k).then(function (b) {
+          out[k] = b; delete ccache[x.id + 'k' + k];
+          if (--left === 0) res(new Blob(out, { type: (x.sm || 'video/webm').split(';')[0] })); else w();
+        }).catch(function (e) { fail = true; rej(e); });
+      }
+      for (var z = 0; z < Math.min(4, x.nc); z++) w();
+    });
+  }
   // video pieces: statusBlobs/uid/sid/c/<chunk>; piece k uses x.sc[k] chunks, starting after the earlier pieces
   var scache = {};
   function getSeg(x, k) {
@@ -350,7 +380,8 @@ var myList = [], contacts = [];
   }
   function prefetch(x) {
     if (!x) return;
-    if (x.ty === 'video' && x.sc) getSeg(x, 0).catch(function () {});
+    if (x.ty === 'video' && x.sm) { for (var j = 0; j < Math.min(12, x.nc || 0); j++) getChunkBytes(x, j).catch(function () {}); }
+    else if (x.ty === 'video' && x.sc) getSeg(x, 0).catch(function () {});
     else if ((x.ty === 'photo' || x.ty === 'video') && !x.im) getBlob(x, 'c').catch(function () {});
     if (x.mn) getBlob(x, 'm').catch(function () {});
   }
@@ -433,6 +464,7 @@ var myList = [], contacts = [];
     f.addEventListener('change', function () { var file = f.files[0]; f.remove(); if (file) cb(file); });
     f.click();
   }
+
   // Add status sheet (Text, Music, then phone gallery / camera)
   function addMenu() {
     if (myList.length >= CONFIG.STATUS_MAX) { alert(T.maxReached.replace('{n}', CONFIG.STATUS_MAX)); return; }
@@ -499,7 +531,9 @@ var myList = [], contacts = [];
       }
       return n;
     }
-    if (media && typeof media === 'object') {
+    if (media && typeof media === 'object' && media.b64) {
+      o.nc = up('c', media.b64, 0); o.sm = media.sm;
+    } else if (media && typeof media === 'object') {
       var cnt = [], at = 0;
       media.segs.forEach(function (sg) { var n = up('c', sg, at); cnt.push(n); at += n; });
       o.sc = cnt; o.nc = at; o.sd = media.sd;
@@ -599,7 +633,8 @@ var myList = [], contacts = [];
     };
     setTimeout(function () { ta.focus(); }, 100);
   }
-/* ----- photo / video: choose, prepare, then composer with Music and Text at top right ----- */
+
+  /* ----- photo / video: choose, prepare, then composer with Music and Text at top right ----- */
   function preparePhoto(file) {
     var rd = new FileReader();
     rd.onload = function (e) {
@@ -635,7 +670,7 @@ var myList = [], contacts = [];
       if (SS && window.MediaRecorder) {
         SS.encode(url, d, { side: CONFIG.VIDEO_SIDE, bps: CONFIG.VIDEO_BPS, seg: CONFIG.SEG_SEC, thumbSide: CONFIG.THUMB_SIDE, thumbQ: CONFIG.THUMB_Q },
           function (p) { upd(T.prep + ' ' + p + '%'); })
-          .then(function (r) { cmpUrl = url; composeMedia('video', null, d, { segs: r.segs, th: r.th, preview: url }); }, raw);
+          .then(function (r) { cmpUrl = url; composeMedia('video', null, d, { b64: r.b64, sm: r.mime, th: r.th, preview: url }); }, raw);
       } else raw();
     };
     v.onerror = function () { URL.revokeObjectURL(url); alert(T.tryAgain); };
@@ -685,7 +720,7 @@ var myList = [], contacts = [];
       if (ex.th) o.th = ex.th;
       if (S.ov) { o.ov = S.ov; o.oc = S.oc; o.ob = S.ob; o.ox = Math.round(S.ox); o.oy = Math.round(S.oy); }
       if (cap.value.trim()) o.cp = cap.value.trim().slice(0, CONFIG.CAP_MAX);
-      var media = ex.segs ? { segs: ex.segs, sd: CONFIG.SEG_SEC } : data;
+      var media = ex.b64 ? { b64: ex.b64, sm: ex.sm } : (ex.segs ? { segs: ex.segs, sd: CONFIG.SEG_SEC } : data);
       var ld = loaderOn();
       publishStatus(o, media, mb.get(), function (p) { ld.set(p); })
         .then(function () { ld.off(); cache.mine = null; closeCmp(); renderStatus(); })
@@ -700,7 +735,7 @@ var myList = [], contacts = [];
   function closeViewer() {
     stopT();
     if (curCleanup) { curCleanup(); curCleanup = null; }
-    stv.style.display = 'none'; stv.innerHTML = ''; scache = {};
+    stv.style.display = 'none'; stv.innerHTML = ''; scache = {}; ccache = {};
     if (paneS.style.display !== 'none') renderStatus();
   }
   function openViewer(who) {
@@ -875,6 +910,26 @@ var myList = [], contacts = [];
         getBlob(x, 'm').then(function (m) { if (my !== token) return; var a2 = new Audio(m); a2.loop = true; audEl = a2; sync(); }).catch(function () {});
       }
 
+      // plain video from a finished download (old statuses, or phones that cannot stream)
+      function playBlob(p) {
+        p.then(function (src) {
+          if (my !== token) return;
+          var vd = h('video'); vd.setAttribute('playsinline', ''); vd.muted = hasMus; vd.preload = 'auto';
+          var go = false;
+          vd.onloadedmetadata = function () { if (vd.videoHeight / vd.videoWidth >= 1.6) vd.style.objectFit = 'cover'; };
+          vd.oncanplay = function () { if (go || my !== token) return; go = true; clearWait(); startPlay(); };
+          vd.onended = function () { if (my === token) { idx++; draw(); } };
+          vd.onerror = skip;
+          vd.src = src; stage.appendChild(vd);
+          vidEl = {
+            play: function () { return vd.play(); }, pause: function () { vd.pause(); },
+            rate: function (r) { vd.playbackRate = r; }, time: function () { return vd.currentTime; },
+            dur: function () { return vd.duration; },
+            destroy: function () { try { vd.pause(); vd.removeAttribute('src'); vd.load(); if (/^blob:/.test(src)) URL.revokeObjectURL(src); } catch (e) {} }
+          };
+        }).catch(skip);
+      }
+
       if (x.ty === 'text') {
         var tx = x.tx || (x.mnm ? '🎵 ' + x.mnm : '');
         var txe = h('div', 'tx', tx); if (x.tc) txe.style.color = x.tc;
@@ -892,6 +947,25 @@ var myList = [], contacts = [];
           im.onerror = skip;
           im.src = src;
         }).catch(skip);
+      } else if (x.sm && window.StatusStream && window.StatusStream.canStream(x.sm)) {
+        // true streaming: one video, data is fed into it while it plays (starts after ~5 seconds, loads on in the background)
+        var started = false;
+        var mp = window.StatusStream.createMsePlayer({
+          stage: stage, mime: x.sm, n: x.nc, dur: x.d, ahead: 5, muted: hasMus,
+          getChunk: function (j) { return getChunkBytes(x, j); },
+          onFirst: function () { if (my !== token) return; started = true; clearWait(); startPlay(); },
+          onEnd: function () { if (my === token) { idx++; draw(); } },
+          onStall: function (b) { if (my === token && ready) spin.style.display = b ? '' : 'none'; },
+          onError: function () {
+            if (my !== token) return;
+            if (started) { skip(); return; }
+            mp.destroy(); vidEl = null;                     // could not stream: download fully, then play
+            playBlob(getStreamBlob(x).then(function (b) { return URL.createObjectURL(b); }));
+          }
+        });
+        vidEl = mp; mp.start();
+      } else if (x.sm) {
+        playBlob(getStreamBlob(x).then(function (b) { return URL.createObjectURL(b); }));
       } else if (x.sc && window.StatusStream) {
         var pl = window.StatusStream.createPlayer({
           stage: stage, n: x.sc.length, sd: x.sd || CONFIG.SEG_SEC, muted: hasMus,
@@ -903,22 +977,7 @@ var myList = [], contacts = [];
         });
         vidEl = pl; pl.start();
       } else {
-        getBlob(x, 'c').then(function (src) {
-          if (my !== token) return;
-          var vd = h('video'); vd.setAttribute('playsinline', ''); vd.muted = hasMus; vd.preload = 'auto';
-          var go = false;
-          vd.onloadedmetadata = function () { if (vd.videoHeight / vd.videoWidth >= 1.6) vd.style.objectFit = 'cover'; };
-          vd.oncanplay = function () { if (go || my !== token) return; go = true; clearWait(); startPlay(); };
-          vd.onended = function () { if (my === token) { idx++; draw(); } };
-          vd.onerror = skip;
-          vd.src = src; stage.appendChild(vd);
-          vidEl = {
-            play: function () { return vd.play(); }, pause: function () { vd.pause(); },
-            rate: function (r) { vd.playbackRate = r; }, time: function () { return vd.currentTime; },
-            dur: function () { return vd.duration; },
-            destroy: function () { try { vd.pause(); vd.removeAttribute('src'); vd.load(); } catch (e) {} }
-          };
-        }).catch(skip);
+        playBlob(getBlob(x, 'c'));
       }
     }
     draw();

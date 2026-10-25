@@ -34,8 +34,8 @@
     });
   }
 
-  /* ---------- upload side: video -> independent pieces ---------- */
-  // o = { side, bps, seg, thumbSide, thumbQ }.  Resolves { segs: [dataURL...], th: dataURL }
+  /* ---------- upload side: ONE continuous video (like a normal streaming file) ---------- */
+  // o = { side, bps, thumbSide, thumbQ }.  Resolves { b64: base64 text (no header), mime, th }
   function encode(url, dur, o, onProg) {
     return new Promise(function (res, rej) {
       var MR = window.MediaRecorder;
@@ -43,7 +43,6 @@
         return MR && MR.isTypeSupported && MR.isTypeSupported(m);
       })[0];
       if (!mime) { rej(new Error('nomime')); return; }
-      var base = mime.split(';')[0];
       var v = document.createElement('video');
       v.src = url; v.setAttribute('playsinline', ''); v.preload = 'auto';
       v.onerror = function () { rej(new Error('verr')); };
@@ -65,33 +64,26 @@
             wake = setInterval(function () { if (ac && ac.state !== 'running') ac.resume(); }, 250);
           }
         } catch (e) {}
-
-        var blobs = [], started = 0, pending = 0, cur = null, th = '', segStart = 0, ended = false, dead = false;
+        var chunks = [], th = '', dead = false, rec = null;
         function closeAc() { clearInterval(wake); if (ac) { try { ac.close(); } catch (e) {} ac = null; } }
-        function startRec() {
-          var rec, ch = [], my = started;
-          try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: o.bps, audioBitsPerSecond: 96000 }); }
-          catch (e) { return null; }
-          started++; pending++;
-          rec.ondataavailable = function (e) { if (e.data && e.data.size) ch.push(e.data); };
-          rec.onstop = function () {
-            blobs[my] = new Blob(ch, { type: base }); pending--;
-            if (ended && pending === 0) finish();
-          };
-          rec.start(1000);
-          return rec;
-        }
-        function finish() {
+        try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: o.bps, audioBitsPerSecond: 96000 }); }
+        catch (e) { closeAc(); rej(new Error('norec')); return; }
+        rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+        rec.onstop = function () {
           if (dead) return; dead = true; closeAc();
-          Promise.all(blobs.map(function (b) {
-            return new Promise(function (r2, j2) {
-              var rd = new FileReader(); rd.onload = function () { r2(rd.result); }; rd.onerror = j2; rd.readAsDataURL(b);
-            });
-          })).then(function (segs) { res({ segs: segs, th: th }); }, rej);
-        }
+          var type = (rec.mimeType || mime), blob = new Blob(chunks, { type: type.split(';')[0] });
+          var rd = new FileReader();
+          rd.onload = function () {
+            var all = String(rd.result), c = all.indexOf(';base64,');
+            if (c < 0) { rej(new Error('b64')); return; }
+            res({ b64: all.slice(c + 8), mime: type, th: th });
+          };
+          rd.onerror = function () { rej(new Error('read')); };
+          rd.readAsDataURL(blob);
+        };
         function abort(err) {
           if (dead) return; dead = true; closeAc();
-          try { if (cur && cur.state !== 'inactive') cur.stop(); } catch (e) {}
+          try { if (rec.state !== 'inactive') rec.stop(); } catch (e) {}
           try { v.pause(); } catch (e) {}
           rej(err);
         }
@@ -101,24 +93,13 @@
           var t = v.currentTime;
           if (!th && t > 0.15) th = drawThumb(cv, cv.width, cv.height, o.thumbSide, o.thumbQ);
           if (onProg && dur) onProg(Math.min(99, Math.round(t * 100 / dur)));
-          // new piece every o.seg seconds (start the new recorder first, then stop the old one: no gap)
-          if (t - segStart >= o.seg && dur - t > 1.2 && !v.ended && cur) {
-            var nr = startRec();
-            if (nr) { var old = cur; cur = nr; segStart = t; if (old.state !== 'inactive') old.stop(); }
-          }
           if (!v.ended) next();
         }
         function next() {
           if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(frame); else requestAnimationFrame(frame);
         }
-        v.onended = function () {
-          ended = true;
-          setTimeout(function () {
-            if (cur && cur.state !== 'inactive') cur.stop(); else if (pending === 0) finish();
-          }, 250);
-        };
-        cur = startRec();
-        if (!cur) { abort(new Error('norec')); return; }
+        v.onended = function () { setTimeout(function () { if (rec.state !== 'inactive') rec.stop(); }, 300); };
+        rec.start(1000);
         var p = v.play();
         if (p && p.catch) p.catch(function () {
           v.muted = true;                                  // phone blocked sound: record without sound
@@ -130,7 +111,86 @@
     });
   }
 
-  /* ---------- watch side: plays piece after piece, loads ahead in background ---------- */
+  /* ---------- watch side (true streaming): one video, data is fed into it while it plays ---------- */
+  function canStream(mime) {
+    return !!(mime && window.MediaSource && MediaSource.isTypeSupported && MediaSource.isTypeSupported(mime));
+  }
+  // o = { stage, mime, n (chunks), dur (sec), ahead (sec to buffer before start), muted, getChunk(j)->Promise<Uint8Array>,
+  //       onFirst, onEnd, onStall(bool), onError }
+  function createMsePlayer(o) {
+    var v = document.createElement('video');
+    v.className = 'sv'; v.setAttribute('playsinline', ''); v.playsInline = true; v.preload = 'auto';
+    v.muted = !!o.muted; v.style.visibility = 'hidden';
+    v.onloadedmetadata = function () { if (v.videoWidth && v.videoHeight / v.videoWidth >= 1.6) v.style.objectFit = 'cover'; };
+    o.stage.appendChild(v);
+    var ms = new MediaSource(), url = URL.createObjectURL(ms), sb = null;
+    var dead = false, first = false, want = false, done = false, stalled = false;
+    var got = {}, nextFetch = 0, nextAppend = 0, inflight = 0, AHEAD = o.ahead || 5;
+
+    function bufEnd() { try { var b = v.buffered; return b.length ? b.end(b.length - 1) : 0; } catch (e) { return 0; } }
+    function fail() { if (!dead && o.onError) o.onError(); }
+    function stall(b) { if (stalled === b) return; stalled = b; if (o.onStall) o.onStall(b); }
+    function fetchMore() {                       // keep loading chunks in order while watching
+      while (!dead && inflight < 4 && nextFetch < o.n && nextFetch - nextAppend < 24) {
+        (function (j) {
+          inflight++;
+          o.getChunk(j).then(function (bytes) {
+            if (dead) return;
+            got[j] = bytes; inflight--; append(); fetchMore();
+          }).catch(function () { inflight--; fail(); });
+        })(nextFetch++);
+      }
+    }
+    function append() {
+      if (dead || !sb || sb.updating) return;
+      if (got[nextAppend]) {
+        var b = got[nextAppend]; delete got[nextAppend]; nextAppend++;
+        try { sb.appendBuffer(b); } catch (e) { fail(); }
+      } else if (nextAppend >= o.n && !done) {
+        done = true;
+        try { if (ms.readyState === 'open') ms.endOfStream(); } catch (e) {}
+        check();
+      }
+    }
+    function check() {                            // start as soon as ~5 seconds are ready
+      if (first || dead) return;
+      var e = bufEnd();
+      if (e >= AHEAD || (done && e > 0)) {
+        first = true;
+        try { if (v.buffered.length && v.buffered.start(0) > 0.05) v.currentTime = v.buffered.start(0); } catch (x) {}
+        v.style.visibility = 'visible';
+        if (o.onFirst) o.onFirst();
+      }
+    }
+    ms.addEventListener('sourceopen', function () {
+      if (sb || dead) return;
+      try { sb = ms.addSourceBuffer(o.mime); } catch (e) { fail(); return; }
+      sb.addEventListener('updateend', function () { append(); fetchMore(); check(); });
+      sb.addEventListener('error', fail);
+      fetchMore();
+    });
+    v.onwaiting = function () { if (first && want) stall(true); };
+    v.onplaying = function () { stall(false); };
+    v.onended = function () { if (!dead && o.onEnd) o.onEnd(); };
+    v.onerror = fail;
+
+    return {
+      start: function () { v.src = url; },
+      play: function () { want = true; return v.play(); },
+      pause: function () { want = false; v.pause(); },
+      rate: function (x) { v.playbackRate = x; },
+      time: function () { return v.currentTime || 0; },
+      dur: function () { return o.dur; },
+      destroy: function () {
+        dead = true; v.onended = v.onerror = v.onwaiting = v.onplaying = null;
+        try { v.pause(); v.removeAttribute('src'); v.load(); } catch (x) {}
+        try { URL.revokeObjectURL(url); } catch (x) {}
+        if (v.parentNode) v.parentNode.removeChild(v);
+      }
+    };
+  }
+
+  /* ---------- older style: video in separate pieces (kept so earlier statuses still play) ---------- */
   // o = { stage, n, sd, muted, getSeg(k)->Promise<Blob>, onFirst, onEnd, onStall(bool), onError }
   // returned object: start() play() pause() rate(r) time() dur() destroy()
   function createPlayer(o) {
@@ -236,5 +296,5 @@
     };
   }
 
-  window.StatusStream = { encode: encode, createPlayer: createPlayer, thumbOfVideo: thumbOfVideo, thumbOfImage: thumbOfImage, thumbOf: thumbOfVideo };
+  window.StatusStream = { encode: encode, canStream: canStream, createMsePlayer: createMsePlayer, createPlayer: createPlayer, thumbOfVideo: thumbOfVideo, thumbOfImage: thumbOfImage, thumbOf: thumbOfVideo };
 })();
