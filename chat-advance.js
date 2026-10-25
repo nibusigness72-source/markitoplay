@@ -19,6 +19,7 @@
   var MAX_BYTES = 8 * 1024 * 1024;            // rules mein bhi 8388608
   var CHUNK = 200000;                          // 4 ka multiple (base64 chunk alag decode hota hai)
   var MAX_CHUNKS = 64;
+  var FILE_TIMER = true;    // true = timer also works for files. Needs one Firebase rule change (see notes), so it is OFF by default.
   var BLOCKED = /\.(exe|bat|cmd|com|msi|scr|apk|jar|js|vbs|ps1|sh|dll|lnk|hta|reg)$/i;
 
   function noop() {}
@@ -94,7 +95,11 @@
     '.advname{font-weight:700;font-size:14px;word-break:break-all}',
     '.advmeta{font-size:11px;color:#cfe3ff;opacity:.85}',
     '.advhint{font-size:11px;color:#facc15;margin-top:2px}',
-    '.adv-up{font-size:13px;opacity:.9}'
+    '.adv-up{font-size:13px;opacity:.9}',
+    '@keyframes advspin{to{transform:rotate(360deg)}}',
+    '.adv-status.load::before,.adv-up.load::before{content:"";display:inline-block;width:18px;height:18px;margin-right:9px;vertical-align:-4px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-right-color:#22d3ee;border-radius:50%;animation:advspin .8s linear infinite}',
+    '.adv-vtimer{display:none!important}',
+    '.msg:has(.advcard) .foot .timer{display:none}'
   ].join('\n');
   var st = document.createElement('style');
   st.textContent = css;
@@ -294,8 +299,7 @@
     }
     return 'application/octet-stream';
   }
-
-  // Chunks ko 4-4 karke download karo, Blob banao
+// Chunks ko 4-4 karke download karo, Blob banao
   function fetchBlob(C, key, d, onP) {
     var base = 'chatBlobs/' + C.getRoom() + '/' + key + '/c/';
     var parts = new Array(d.nc), done = 0, next = 0, failed = false;
@@ -339,17 +343,18 @@
     var token = ++vs.token;
     vs.key = key;
     v._b.innerHTML = ''; v._t.textContent = '';
-    var status = h('div', 'adv-status', '\u23EC Loading... 0%');
+    var status = h('div', 'adv-status load', 'Loading... 0%');
     v._b.appendChild(status);
     v.style.display = 'flex';
 
     fetchBlob(C, key, d, function (p) {
-      if (vs.token === token) status.textContent = '\u23EC Loading... ' + p + '%';
+      if (vs.token === token) status.textContent = 'Loading... ' + p + '%';
     }).then(function (blob) {
       if (vs.token !== token) return;
       if (d.type === 'video') playVideo(C, key, d, blob, v); else showFile(C, key, d, blob, v);
     }).catch(function (err) {
       if (vs.token !== token) return;
+      status.className = 'adv-status';
       status.textContent = '\u274C ' + (err && err.message === 'gone' ? 'File is no longer available' : 'Could not load. Please try again.');
     });
   }
@@ -484,8 +489,7 @@
       for (var k = 0; k < Math.min(3, n); k++) w();
     });
   }
-
-  function sendMedia(f) {
+function sendMedia(f) {
     var C = core();
     if (!C || !C.getRoom() || !C.getPeer()) { alert('Please open a chat first'); return; }
     if (sending) { alert('The first file is still uploading. Please wait.'); return; }
@@ -496,7 +500,7 @@
     var ref = C.getMsgRef(), room = C.getRoom(), me = C.getMe();
     var advCfg = take();                       // timer sirf is ek bhejne ke liye
     var name = safeName(f.name);
-    var prog = h('div', 'msg mine adv-up', '\u2B06\uFE0F ' + name + ' is being prepared...');
+    var prog = h('div', 'msg mine adv-up load', name + ' is being prepared...');
     var list = $('messages');
     list.appendChild(prog); list.scrollTop = list.scrollHeight;
     sending = true;
@@ -511,9 +515,12 @@
         var key = ref.push().key;
         base = 'chatBlobs/' + room + '/' + key;
         return C.db.ref(base + '/o').set(me.uid).then(function () {
-          return uploadChunks(C, base, b64, n, function (p) { prog.textContent = '\u2B06\uFE0F ' + name + '  ' + p + '%'; });
+          return uploadChunks(C, base, b64, n, function (p) { prog.textContent = name + '  ' + p + '%'; });
         }).then(function () {
-          var meta = { from: me.uid, type: asVideo ? 'video' : 'file', fn: name, sz: f.size, nc: n, dur: asVideo ? ms : 60000, t: C.TS };
+          var dur = asVideo ? ms : 60000, tm = (advCfg && advCfg.mode !== 'keep') ? advCfg : null;
+          if (tm && (asVideo || FILE_TIMER)) dur = Math.max(1000, Math.min(asVideo ? 3600000 : 600000, tm.sec * 1000));
+          var meta = { from: me.uid, type: asVideo ? 'video' : 'file', fn: name, sz: f.size, nc: n, dur: dur, t: C.TS };
+          if (tm && tm.mode === 'sent' && (asVideo || FILE_TIMER)) meta.mode = 'sent';
           if (/^[\w.+-]+\/[\w.+-]+$/.test(f.type || '') && f.type.length <= 100) meta.mime = f.type;
           if (!asVideo && advCfg && advCfg.mode === 'keep') meta.mode = 'keep';     // permanent file (video nahi)
           return ref.child(key).set(meta);
