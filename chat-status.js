@@ -28,6 +28,10 @@
     SQUEEZE_MB: 5,              // videos bigger than this are re-encoded (made smaller) automatically
     RAW_MAX_MB: 20,             // only if re-encoding is not possible on the phone: biggest raw video allowed
     CHUNK: 150000,              // upload piece size (characters)
+    SEG_SEC: 5,                 // status video is cut into pieces of this many seconds (first piece loads, plays, rest loads while watching)
+    THUMB_SIDE: 200,            // small preview picture shown while a status loads (pixels)
+    THUMB_Q: 0.55,              // preview picture quality 0.1 - 1
+    TEXT_COLORS: ['#ffffff', '#facc15', '#22d3ee', '#4ade80', '#f472b6', '#fb923c', '#a78bfa', '#111827'],   // text status colours (A button)
     BG: [                       // text status background colours (top to bottom)
       ['#2563eb', '#7c3aed'], ['#db2777', '#f97316'], ['#059669', '#0ea5e9'], ['#7c3aed', '#ec4899'],
       ['#b45309', '#facc15'], ['#0f172a', '#334155'], ['#dc2626', '#7f1d1d'], ['#0d9488', '#164e63']
@@ -62,6 +66,7 @@
     pwDone: 'Password changed successfully', tryAgain: 'Something went wrong. Please try again.',
     lockNow: 'Lock chat now', lockSub: 'Password will be required next time',
     goGames: 'Go to Games',
+    changeName: 'Change username', nameSub: 'Your chat username',
     cancel: 'Cancel', save: 'Save'
   };
 
@@ -194,7 +199,15 @@
     '.shl{color:#9fb0d9;font-size:15px;margin:6px 0 10px}',
     '.shg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}',
     '.shg button{aspect-ratio:1;background:#16245e;border:none;border-radius:12px;color:#fff;font-size:13px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer}',
-    '.shg button span{font-size:30px}'
+    '.shg button span{font-size:30px}',
+    /* loader + thumbnail (no black screen while a status loads) */
+    '@keyframes stspin{to{transform:rotate(360deg)}}',
+    '.spin{width:48px;height:48px;border-radius:50%;border:5px solid rgba(255,255,255,.28);border-top-color:#fff;border-right-color:#22d3ee;box-shadow:0 0 16px rgba(34,211,238,.7);animation:stspin .8s linear infinite}',
+    '.stv .stage>img,.stv .stage>video{position:absolute;left:0;top:0}',
+    '.stv .stage img.thm{filter:blur(4px);z-index:1}',
+    '.stv .stage video.sv{z-index:2}',
+    '.stv .stage .spin{position:absolute;left:50%;top:50%;margin:-24px 0 0 -24px;z-index:3}',
+    '.sendld{position:absolute;left:0;right:0;top:0;bottom:0;background:rgba(0,0,0,.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;font-size:16px;font-weight:700;z-index:9}'
   ].join('\n');
   document.head.appendChild(st);
   /* ---------------- Layout: tabs + panes + bottom bar ---------------- */
@@ -300,9 +313,45 @@ var myList = [], contacts = [];
       bcache[key] = src; return src;
     });
   }
+  // video pieces: statusBlobs/uid/sid/c/<chunk>; piece k uses x.sc[k] chunks, starting after the earlier pieces
+  var scache = {};
+  function getSeg(x, k) {
+    var key = x.id + 's' + k;
+    if (scache[key]) return scache[key];
+    var start = 0, cnt = x.sc[k], i;
+    for (i = 0; i < k; i++) start += x.sc[i];
+    var base = 'statusBlobs/' + x.uid + '/' + x.id + '/c/';
+    scache[key] = new Promise(function (res, rej) {
+      var parts = new Array(cnt), next = 0, done = 0, fail = false, fin = false;
+      function finish() {
+        if (fin) return; fin = true;
+        try {
+          var all = parts.join(''), c = all.indexOf(';base64,');
+          if (all.indexOf('data:') !== 0 || c < 0) throw new Error('bad');
+          var mime = all.slice(5, c).split(';')[0] || 'video/webm';
+          var bin = atob(all.slice(c + 8)), n = bin.length, bytes = new Uint8Array(n);
+          for (var q = 0; q < n; q++) bytes[q] = bin.charCodeAt(q);
+          res(new Blob([bytes], { type: mime }));
+        } catch (e) { delete scache[key]; rej(e); }
+      }
+      function w() {
+        if (fail) return;
+        if (next >= cnt) { if (done >= cnt) finish(); return; }
+        var j = next++;
+        db.ref(base + (start + j)).once('value').then(function (s) {
+          var v = s.val();
+          if (typeof v !== 'string') throw new Error('missing');
+          parts[j] = v; done++; w();
+        }).catch(function (e) { fail = true; delete scache[key]; rej(e); });
+      }
+      for (var z = 0; z < Math.min(3, cnt); z++) w();
+    });
+    return scache[key];
+  }
   function prefetch(x) {
     if (!x) return;
-    if ((x.ty === 'photo' || x.ty === 'video') && !x.im) getBlob(x, 'c').catch(function () {});
+    if (x.ty === 'video' && x.sc) getSeg(x, 0).catch(function () {});
+    else if ((x.ty === 'photo' || x.ty === 'video') && !x.im) getBlob(x, 'c').catch(function () {});
     if (x.mn) getBlob(x, 'm').catch(function () {});
   }
   function prefetchFirst(arr) {
@@ -361,7 +410,17 @@ var myList = [], contacts = [];
 
   /* ----- helpers for creating a status ----- */
   var cmp = h('div', 'ov'); document.body.appendChild(cmp);
-  function closeCmp() { cmp.style.display = 'none'; cmp.innerHTML = ''; }
+  var cmpUrl = null;     // preview link of a video being prepared (freed when the composer closes)
+  function closeCmp() {
+    cmp.style.display = 'none'; cmp.innerHTML = '';
+    if (cmpUrl) { try { URL.revokeObjectURL(cmpUrl); } catch (e) {} cmpUrl = null; }
+  }
+  // bright loader with percent while a status is being posted
+  function loaderOn() {
+    var w = h('div', 'sendld'); w.appendChild(h('div', 'spin'));
+    var t = h('div', '', '0%'); w.appendChild(t); cmp.appendChild(w);
+    return { set: function (p) { t.textContent = p + '%'; }, off: function () { if (w.parentNode) w.parentNode.removeChild(w); } };
+  }
   function busy(msg) {
     cmp.innerHTML = ''; cmp.style.display = 'flex'; cmp.style.background = '#0b1544';
     var b = h('div', 'cmp-body'), t = h('div', 'vload', msg); b.appendChild(t); cmp.appendChild(b);
@@ -392,10 +451,14 @@ var myList = [], contacts = [];
     big('✏️', T.tText, function () { close(); composeText(null); });
     big('🎵', T.tMusic, function () {
       close();
-      pickFileThen('audio/*', false, function (file) {
-        busy(T.prep);
-        prepMusic(file).then(function (m) { composeText(m); }, function () { closeCmp(); alert(T.musicFail); });
-      });
+      function local(cb) {
+        pickFileThen('audio/*', false, function (file) {
+          busy(T.prep);
+          prepMusic(file).then(cb, function () { closeCmp(); alert(T.musicFail); });
+        });
+      }
+      var done = function (m) { composeText(m); };
+      if (window.StatusMusic) window.StatusMusic.choose({ local: local, done: done }); else local(done);
     });
     sh.appendChild(row);
 
@@ -420,23 +483,30 @@ var myList = [], contacts = [];
   }
 
   /* ----- publish (media and music go in pieces, then the small status record) ----- */
+  // media = one data-URL string (photo / old-style video)  OR  { segs:[dataURL...], sd } (video in 5-second pieces)
+  // music = { url, sec, name } (online song, only the link is saved)  OR  { data, sec, name } (file from phone)
   function publishStatus(o, media, music, onProg) {
     var C = core(), me = C.getMe();
     var ref = db.ref('statuses/' + me.uid).push(), sid = ref.key;
     var jobs = [], total = 0, done = 0;
-    function up(kind, data) {
+    function up(kind, data, from) {
       var n = Math.ceil(data.length / CONFIG.CHUNK); total += n;
       for (var i = 0; i < n; i++) {
         (function (i) {
-          jobs.push(db.ref('statusBlobs/' + me.uid + '/' + sid + '/' + kind + '/' + i)
+          jobs.push(db.ref('statusBlobs/' + me.uid + '/' + sid + '/' + kind + '/' + (from + i))
             .set(data.substr(i * CONFIG.CHUNK, CONFIG.CHUNK))
             .then(function () { done++; if (onProg) onProg(Math.round(done * 100 / total)); }));
         })(i);
       }
       return n;
     }
-    if (media) o.nc = up('c', media);
-    if (music) { o.mn = up('m', music.data); o.md = music.sec; o.mnm = music.name; }
+    if (media && typeof media === 'object') {
+      var cnt = [], at = 0;
+      media.segs.forEach(function (sg) { var n = up('c', sg, at); cnt.push(n); at += n; });
+      o.sc = cnt; o.nc = at; o.sd = media.sd;
+    } else if (media) o.nc = up('c', media, 0);
+    if (music && music.url) { o.mu = music.url; o.md = music.sec; o.mnm = music.name; }
+    else if (music) { o.mn = up('m', music.data, 0); o.md = music.sec; o.mnm = music.name; }
     o.t = TS; o.e = nowS() + Math.min(24, CONFIG.STATUS_HOURS) * 3600000;
     return Promise.all(jobs).then(function () { return ref.set(o); }).catch(function (err) {
       db.ref('statusBlobs/' + me.uid + '/' + sid).remove().catch(function () {});
@@ -479,31 +549,36 @@ var myList = [], contacts = [];
       rd.readAsArrayBuffer(file);
     });
   }
-  // music button + small chip (tap chip to remove)
+  // music button + small chip (tap chip to remove). Search online or pick from phone.
   function musicBox(btn) {
     var m = null, chip = h('div', 'mchip2'); chip.style.display = 'none';
     function paint() { chip.style.display = m ? '' : 'none'; chip.textContent = m ? '🎵 ' + m.name + '  ✕' : ''; }
     chip.onclick = function () { m = null; paint(); };
     btn.onclick = function () {
-      pickFileThen('audio/*', false, function (file) {
-        var old = btn.textContent; btn.disabled = true; btn.textContent = '⏳';
-        prepMusic(file).then(function (r) { m = r; paint(); }, function () { alert(T.musicFail); })
-          .then(function () { btn.disabled = false; btn.textContent = old; });
-      });
+      function local(cb) {
+        pickFileThen('audio/*', false, function (file) {
+          var old = btn.textContent; btn.disabled = true; btn.textContent = '⏳';
+          prepMusic(file).then(cb, function () { alert(T.musicFail); })
+            .then(function () { btn.disabled = false; btn.textContent = old; });
+        });
+      }
+      var done = function (r) { m = r; paint(); };
+      if (window.StatusMusic) window.StatusMusic.choose({ local: local, done: done }); else local(done);
     };
     return { chip: chip, get: function () { return m; }, set: function (v) { m = v; paint(); } };
   }
 
   /* ----- text status ----- */
   function composeText(pre) {
-    var bg = Math.floor(Math.random() * CONFIG.BG.length);
+    var bg = Math.floor(Math.random() * CONFIG.BG.length), tci = 0, TC = CONFIG.TEXT_COLORS;
     cmp.innerHTML = ''; cmp.style.display = 'flex'; cmp.style.background = grad(bg);
     var top = h('div', 'top');
     var x = h('button', '', '✕'); x.type = 'button'; x.onclick = closeCmp;
     var sp = h('div', 'sp'); var cnt = h('span', 'cnt', '0/' + CONFIG.TEXT_MAX);
     var bm = h('button', '', '🎵'); bm.type = 'button';
+    var tcb = h('button', '', 'A'); tcb.type = 'button'; tcb.style.fontWeight = '800';
     var pal = h('button', '', '🎨'); pal.type = 'button';
-    top.appendChild(x); top.appendChild(sp); top.appendChild(cnt); top.appendChild(bm); top.appendChild(pal);
+    top.appendChild(x); top.appendChild(sp); top.appendChild(cnt); top.appendChild(bm); top.appendChild(tcb); top.appendChild(pal);
     var mb = musicBox(bm); if (pre) mb.set(pre);
     var body = h('div', 'cmp-body'); var ta = h('textarea'); ta.placeholder = T.typePh; ta.maxLength = CONFIG.TEXT_MAX; body.appendChild(ta);
     var bot = h('div', 'cmp-bot'); var s2 = h('div', 'sp'); s2.style.flex = '1';
@@ -511,14 +586,17 @@ var myList = [], contacts = [];
     cmp.appendChild(top); cmp.appendChild(mb.chip); cmp.appendChild(body); cmp.appendChild(bot);
     ta.oninput = function () { cnt.textContent = ta.value.length + '/' + CONFIG.TEXT_MAX; };
     pal.onclick = function () { bg = (bg + 1) % CONFIG.BG.length; cmp.style.background = grad(bg); };
+    tcb.onclick = function () { tci = (tci + 1) % TC.length; ta.style.color = TC[tci]; tcb.style.color = TC[tci]; };
     send.onclick = function () {
       var t = ta.value.trim(); if (!t && !mb.get()) return;
-      send.disabled = true; send.style.fontSize = '12px';
+      send.disabled = true;
       var o = { ty: 'text', bg: bg };
+      if (tci) o.tc = TC[tci];
       if (t) o.tx = t.slice(0, CONFIG.TEXT_MAX);
-      publishStatus(o, null, mb.get(), function (p) { send.textContent = p + '%'; })
-        .then(function () { cache.mine = null; closeCmp(); renderStatus(); })
-        .catch(function () { send.disabled = false; send.textContent = '➤'; send.style.fontSize = ''; alert(T.postFail); });
+      var ld = loaderOn();
+      publishStatus(o, null, mb.get(), function (p) { ld.set(p); })
+        .then(function () { ld.off(); cache.mine = null; closeCmp(); renderStatus(); })
+        .catch(function () { ld.off(); send.disabled = false; alert(T.postFail); });
     };
     setTimeout(function () { ta.focus(); }, 100);
   }
@@ -532,7 +610,8 @@ var myList = [], contacts = [];
         var sc = Math.min(1, CONFIG.PHOTO_SIDE / Math.max(im.width, im.height));
         var cv = document.createElement('canvas'); cv.width = Math.round(im.width * sc); cv.height = Math.round(im.height * sc);
         cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
-        composeMedia('photo', cv.toDataURL('image/jpeg', CONFIG.PHOTO_QUALITY), 0);
+        var th = window.StatusStream ? window.StatusStream.thumbOfImage(cv, CONFIG.THUMB_SIDE, CONFIG.THUMB_Q) : '';
+        composeMedia('photo', cv.toDataURL('image/jpeg', CONFIG.PHOTO_QUALITY), 0, { th: th });
       };
       im.src = e.target.result;
     };
@@ -545,70 +624,29 @@ var myList = [], contacts = [];
       var d = isFinite(v.duration) ? Math.round(v.duration) : 0;
       if (!d) { URL.revokeObjectURL(url); alert(T.tryAgain); return; }
       if (v.duration > CONFIG.MAX_SEC + 0.5) { URL.revokeObjectURL(url); alert(T.tooLong.replace('{s}', CONFIG.MAX_SEC)); return; }
-      var upd = busy(T.prep);
+      var upd = busy(T.prep), SS = window.StatusStream;
+      // fallback (phone cannot re-record): whole video as one piece
       function raw() {
         if (file.size > CONFIG.RAW_MAX_MB * 1048576) { URL.revokeObjectURL(url); closeCmp(); alert(T.tooHeavy); return; }
-        var rd = new FileReader();
-        rd.onload = function (e) { URL.revokeObjectURL(url); composeMedia('video', e.target.result, d); };
-        rd.readAsDataURL(file);
+        (SS ? SS.thumbOfVideo(url, CONFIG.THUMB_SIDE, CONFIG.THUMB_Q) : Promise.resolve('')).then(function (th) {
+          var rd = new FileReader();
+          rd.onload = function (e) { URL.revokeObjectURL(url); composeMedia('video', e.target.result, d, { th: th }); };
+          rd.readAsDataURL(file);
+        });
       }
-      if (file.size > CONFIG.SQUEEZE_MB * 1048576 && window.MediaRecorder) {
-        squeezeVideo(url, d, function (p) { upd(T.prep + ' ' + p + '%'); })
-          .then(function (data) { URL.revokeObjectURL(url); composeMedia('video', data, d); }, raw);
+      if (SS && window.MediaRecorder) {
+        SS.encode(url, d, { side: CONFIG.VIDEO_SIDE, bps: CONFIG.VIDEO_BPS, seg: CONFIG.SEG_SEC, thumbSide: CONFIG.THUMB_SIDE, thumbQ: CONFIG.THUMB_Q },
+          function (p) { upd(T.prep + ' ' + p + '%'); })
+          .then(function (r) { cmpUrl = url; composeMedia('video', null, d, { segs: r.segs, th: r.th, preview: url }); }, raw);
       } else raw();
     };
     v.onerror = function () { URL.revokeObjectURL(url); alert(T.tryAgain); };
     v.src = url;
   }
-  // re-record a big video at lower quality (takes about as long as the video itself)
-  function squeezeVideo(url, dur, onProg) {
-    return new Promise(function (res, rej) {
-      var MR = window.MediaRecorder;
-      var mime = ['video/webm;codecs=vp8,opus', 'video/webm'].filter(function (m) { return MR && MR.isTypeSupported(m); })[0];
-      if (!mime) { rej(new Error('nomime')); return; }
-      var v = document.createElement('video'); v.src = url; v.setAttribute('playsinline', ''); v.preload = 'auto';
-      v.onerror = function () { rej(new Error('verr')); };
-      v.onloadedmetadata = function () {
-        var sc = Math.min(1, CONFIG.VIDEO_SIDE / Math.max(v.videoWidth, v.videoHeight));
-        var cv = document.createElement('canvas');
-        cv.width = Math.max(2, Math.round(v.videoWidth * sc) & ~1); cv.height = Math.max(2, Math.round(v.videoHeight * sc) & ~1);
-        if (!cv.captureStream) { rej(new Error('nocap')); return; }
-        var cx = cv.getContext('2d'), stream = cv.captureStream(24), ac = null;
-        try {
-          var AC = window.AudioContext || window.webkitAudioContext;
-          if (AC) {
-            ac = new AC();
-            var sn = ac.createMediaElementSource(v), ad = ac.createMediaStreamDestination();
-            sn.connect(ad);
-            ad.stream.getAudioTracks().forEach(function (t) { stream.addTrack(t); });
-            if (ac.state === 'suspended') ac.resume();
-          }
-        } catch (e) {}
-        var rec, chunks = [];
-        try { rec = new MR(stream, { mimeType: mime, videoBitsPerSecond: CONFIG.VIDEO_BPS, audioBitsPerSecond: 64000 }); }
-        catch (e) { rej(e); return; }
-        rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-        rec.onstop = function () {
-          if (ac) { try { ac.close(); } catch (e) {} }
-          var rd = new FileReader();
-          rd.onload = function () { res(rd.result); };
-          rd.onerror = rej;
-          rd.readAsDataURL(new Blob(chunks, { type: 'video/webm' }));
-        };
-        function frame() {
-          cx.drawImage(v, 0, 0, cv.width, cv.height);
-          if (onProg && dur) onProg(Math.min(99, Math.round(v.currentTime * 100 / dur)));
-          if (!v.ended && rec.state !== 'inactive') requestAnimationFrame(frame);
-        }
-        v.onended = function () { setTimeout(function () { if (rec.state !== 'inactive') rec.stop(); }, 250); };
-        rec.start(500);
-        var p = v.play(); if (p && p.catch) p.catch(function (e) { try { rec.stop(); } catch (er) {} rej(e); });
-        frame();
-      };
-    });
-  }
-  function composeMedia(kind, data, d) {
-    var ov = '';
+  // ex = { th: thumbnail, segs: video pieces, preview: link to show the video here }
+  function composeMedia(kind, data, d, ex) {
+    ex = ex || {};
+    var S = { ov: '', oc: '#ffffff', ob: 'rgba(0,0,0,.45)', ox: 50, oy: 50 };   // text on the status
     cmp.innerHTML = ''; cmp.style.display = 'flex'; cmp.style.background = '#000';
     var top = h('div', 'top');
     var x = h('button', '', '✕'); x.type = 'button'; x.onclick = closeCmp;
@@ -618,44 +656,52 @@ var myList = [], contacts = [];
     var mb = musicBox(bm);
     var body = h('div', 'cmp-body'); body.style.position = 'relative';
     var el;
-    if (kind === 'video') { el = h('video'); el.src = data; el.controls = true; el.setAttribute('playsinline', ''); }
+    if (kind === 'video') { el = h('video'); el.src = ex.preview || data; el.controls = true; el.setAttribute('playsinline', ''); }
     else { el = h('img'); el.src = data; }
     el.style.cssText = 'max-width:100%;max-height:70vh;border-radius:10px';
     body.appendChild(el);
-    var ovEl = h('div', 'ovt'); ovEl.style.display = 'none'; body.appendChild(ovEl);
+    var ovEl = h('div', 'ovt'); ovEl.style.display = 'none';
     var bot = h('div', 'cmp-bot'); var cap = h('input'); cap.placeholder = T.capPh; cap.maxLength = CONFIG.CAP_MAX;
     var send = h('button', '', '➤'); send.type = 'button'; bot.appendChild(cap); bot.appendChild(send);
-    cmp.appendChild(top); cmp.appendChild(mb.chip); cmp.appendChild(body); cmp.appendChild(bot);
+    cmp.appendChild(top); cmp.appendChild(mb.chip); cmp.appendChild(body); cmp.appendChild(bot); cmp.appendChild(ovEl);
+    if (window.StatusText) window.StatusText.drag(ovEl, S, cmp);      // drag the text anywhere
+    function paintOv() {
+      ovEl.textContent = S.ov; ovEl.style.display = S.ov ? '' : 'none';
+      if (window.StatusText) window.StatusText.style(ovEl, S);
+    }
     bt.onclick = function () {
+      if (window.StatusText) { window.StatusText.edit(S, paintOv); return; }
       modal(T.typeOv, function (box, close) {
-        var i = h('input'); i.maxLength = 80; i.value = ov; i.placeholder = T.typePh; box.appendChild(i);
+        var i = h('input'); i.maxLength = 80; i.value = S.ov; i.placeholder = T.typePh; box.appendChild(i);
         var b2 = h('div', 'b2'), c = h('button', '', T.cancel), s = h('button', 'p', T.save);
         c.type = s.type = 'button'; b2.appendChild(c); b2.appendChild(s); box.appendChild(b2);
         c.onclick = close;
-        s.onclick = function () { ov = i.value.trim().slice(0, 80); ovEl.textContent = ov; ovEl.style.display = ov ? '' : 'none'; close(); };
+        s.onclick = function () { S.ov = i.value.trim().slice(0, 80); paintOv(); close(); };
         setTimeout(function () { i.focus(); }, 100);
       });
     };
     send.onclick = function () {
-      send.disabled = true; cap.disabled = true; send.style.fontSize = '12px';
+      send.disabled = true; cap.disabled = true;
       var o = { ty: kind };
       if (kind === 'video') o.d = d;
-      if (ov) o.ov = ov;
+      if (ex.th) o.th = ex.th;
+      if (S.ov) { o.ov = S.ov; o.oc = S.oc; o.ob = S.ob; o.ox = Math.round(S.ox); o.oy = Math.round(S.oy); }
       if (cap.value.trim()) o.cp = cap.value.trim().slice(0, CONFIG.CAP_MAX);
-      publishStatus(o, data, mb.get(), function (p) { send.textContent = p + '%'; })
-        .then(function () { cache.mine = null; closeCmp(); renderStatus(); })
-        .catch(function () { send.disabled = false; cap.disabled = false; send.textContent = '➤'; send.style.fontSize = ''; alert(T.postFail); });
+      var media = ex.segs ? { segs: ex.segs, sd: CONFIG.SEG_SEC } : data;
+      var ld = loaderOn();
+      publishStatus(o, media, mb.get(), function (p) { ld.set(p); })
+        .then(function () { ld.off(); cache.mine = null; closeCmp(); renderStatus(); })
+        .catch(function () { ld.off(); send.disabled = false; cap.disabled = false; alert(T.postFail); });
     };
   }
-
-  /* ----- view status (full screen: tap = pause, hold = 2x, swipe left/right = next/back, swipe up = views) ----- */
+/* ----- view status (full screen: tap = pause, hold = 2x, swipe left/right = next/back, swipe up = views) ----- */
   var stv = h('div', 'ov stv'); document.body.appendChild(stv);
   var vt = null, curCleanup = null;
   function stopT() { if (vt) { clearInterval(vt); vt = null; } }
   function closeViewer() {
     stopT();
     if (curCleanup) { curCleanup(); curCleanup = null; }
-    stv.style.display = 'none'; stv.innerHTML = '';
+    stv.style.display = 'none'; stv.innerHTML = ''; scache = {};
     if (paneS.style.display !== 'none') renderStatus();
   }
   function openViewer(who) {
@@ -668,13 +714,13 @@ var myList = [], contacts = [];
     function paused() { return userPause || ext > 0; }
     function play(el) { var p = el.play(); if (p && p.catch) p.catch(function () {}); }
     function sync() {
-      if (vidEl) { vidEl.playbackRate = rate; if (!ready || paused()) vidEl.pause(); else play(vidEl); }
+      if (vidEl) { vidEl.rate(rate); if (!ready || paused()) vidEl.pause(); else play(vidEl); }
       if (audEl) { audEl.playbackRate = rate; if (!ready || paused()) audEl.pause(); else play(audEl); }
       var pi = stv.querySelector('.pind'); if (pi) pi.style.display = userPause ? '' : 'none';
       var rc = stv.querySelector('.rchip'); if (rc) rc.style.display = rate > 1 ? '' : 'none';
     }
     function dropMedia() {
-      if (vidEl) { try { vidEl.pause(); vidEl.removeAttribute('src'); vidEl.load(); } catch (e) {} vidEl = null; }
+      if (vidEl) { try { vidEl.destroy(); } catch (e) {} vidEl = null; }
       if (audEl) { try { audEl.pause(); } catch (e) {} audEl = null; }
     }
     VC = { hold: function () { ext++; sync(); }, release: function () { ext = Math.max(0, ext - 1); sync(); } };
@@ -724,8 +770,8 @@ var myList = [], contacts = [];
       var cl = h('button', '', '✕'); cl.type = 'button'; cl.onclick = closeViewer; top.appendChild(cl);
       var stage = h('div', 'stage');
       stv.appendChild(bars); stv.appendChild(top); stv.appendChild(stage);
-      if (x.mn && x.mnm) stv.appendChild(h('div', 'mchip', '🎵 ' + x.mnm));
-      if (x.ov && x.ty !== 'text') stv.appendChild(h('div', 'ovt', x.ov));
+      if ((x.mn || x.mu) && x.mnm) stv.appendChild(h('div', 'mchip', '🎵 ' + x.mnm));
+      if (x.ov && x.ty !== 'text') { var ot = h('div', 'ovt', x.ov); if (window.StatusText) window.StatusText.style(ot, x); stv.appendChild(ot); }
       if ((x.ty === 'photo' || x.ty === 'video') && x.cp) stv.appendChild(h('div', 'cap', x.cp));
       var pind = h('div', 'pind', '⏸'); pind.style.display = 'none'; stv.appendChild(pind);
       var rchip = h('div', 'rchip', '2x ▶▶'); rchip.style.display = 'none'; stv.appendChild(rchip);
@@ -801,45 +847,80 @@ var myList = [], contacts = [];
       function tick() {
         if (my !== token) { stopT(); return; }
         var frac;
-        if (vidEl) frac = Math.min(1, vidEl.currentTime / (x.d || vidEl.duration || 1));
+        if (vidEl) frac = Math.min(1, vidEl.time() / (x.d || vidEl.dur() || 1));
         else { if (!paused()) elapsed += 0.05 * rate; frac = Math.min(1, elapsed / dur); }
         var bi = bars.children[idx] && bars.children[idx].firstChild;
         if (bi) bi.style.width = (frac * 100) + '%';
         if (!vidEl && frac >= 1) { stopT(); idx++; draw(); }
       }
 
-      // media: nothing is shown while it comes (no "Loading" text); timer starts only when it is ready
-      var pm = (x.ty === 'photo' || x.ty === 'video') ? (x.im ? Promise.resolve(safeSrc(x.im)) : getBlob(x, 'c')) : Promise.resolve(null);
-      var pu = x.mn ? getBlob(x, 'm').catch(function () { return null; }) : Promise.resolve(null);
-      Promise.all([pm, pu]).then(function (r) {
-        if (my !== token) return;
-        var med = r[0], mus = r[1];
-        if (x.ty === 'text') {
-          var tx = x.tx || (x.mn ? '🎵 ' + (x.mnm || '') : '');
-          stage.appendChild(h('div', 'tx', tx));
-        } else if (x.ty === 'photo') {
+      // media: thumbnail + bright loader come at once (never a black screen); the real media replaces them as it arrives.
+      // Video plays after its first 5-second piece, the rest keeps loading in the background while you watch.
+      var hasMus = !!(x.mu || x.mn), thumb = null, spin = h('div', 'spin');
+      if (x.ty !== 'text') {
+        var ts = x.th ? safeSrc(x.th) : '';
+        if (ts) { thumb = h('img', 'thm'); thumb.src = ts; stage.appendChild(thumb); }
+        stage.appendChild(spin);
+      }
+      function clearWait() { if (thumb && thumb.parentNode) thumb.parentNode.removeChild(thumb); thumb = null; spin.style.display = 'none'; }
+      function startPlay() { if (my !== token) return; ready = true; sync(); prefetch(list[idx + 1]); stopT(); vt = setInterval(tick, 50); }
+      function skip() { if (my !== token) return; setTimeout(function () { if (my === token) { idx++; draw(); } }, 700); }
+
+      // music: an online song streams from its link at once; a file song comes in pieces
+      if (x.mu && /^https:\/\/[a-z0-9.-]+\.(mzstatic|apple)\.com\//i.test(x.mu)) {
+        var au = new Audio(); au.loop = true; au.preload = 'auto'; au.src = x.mu; audEl = au;
+      } else if (x.mn) {
+        getBlob(x, 'm').then(function (m) { if (my !== token) return; var a2 = new Audio(m); a2.loop = true; audEl = a2; sync(); }).catch(function () {});
+      }
+
+      if (x.ty === 'text') {
+        var tx = x.tx || (x.mnm ? '🎵 ' + x.mnm : '');
+        var txe = h('div', 'tx', tx); if (x.tc) txe.style.color = x.tc;
+        stage.appendChild(txe);
+        startPlay();
+      } else if (x.ty === 'photo') {
+        (x.im ? Promise.resolve(safeSrc(x.im)) : getBlob(x, 'c')).then(function (src) {
+          if (my !== token) return;
           var im = h('img');
-          im.onload = function () { if (im.naturalHeight / im.naturalWidth >= 1.6) im.style.objectFit = 'cover'; };
-          im.src = med; stage.appendChild(im);
-        } else {
-          var vd = h('video'); vd.setAttribute('playsinline', ''); vd.muted = !!mus;
+          im.onload = function () {
+            if (my !== token) return;
+            if (im.naturalHeight / im.naturalWidth >= 1.6) im.style.objectFit = 'cover';
+            stage.appendChild(im); clearWait(); startPlay();
+          };
+          im.onerror = skip;
+          im.src = src;
+        }).catch(skip);
+      } else if (x.sc && window.StatusStream) {
+        var pl = window.StatusStream.createPlayer({
+          stage: stage, n: x.sc.length, sd: x.sd || CONFIG.SEG_SEC, muted: hasMus,
+          getSeg: function (k) { return getSeg(x, k); },
+          onFirst: function () { if (my !== token) return; clearWait(); startPlay(); },
+          onEnd: function () { if (my === token) { idx++; draw(); } },
+          onStall: function (b) { if (my === token && ready) spin.style.display = b ? '' : 'none'; },
+          onError: skip
+        });
+        vidEl = pl; pl.start();
+      } else {
+        getBlob(x, 'c').then(function (src) {
+          if (my !== token) return;
+          var vd = h('video'); vd.setAttribute('playsinline', ''); vd.muted = hasMus; vd.preload = 'auto';
+          var go = false;
           vd.onloadedmetadata = function () { if (vd.videoHeight / vd.videoWidth >= 1.6) vd.style.objectFit = 'cover'; };
+          vd.oncanplay = function () { if (go || my !== token) return; go = true; clearWait(); startPlay(); };
           vd.onended = function () { if (my === token) { idx++; draw(); } };
-          vd.onerror = function () { if (my === token) { idx++; draw(); } };
-          vd.src = med; stage.appendChild(vd); vidEl = vd;
-        }
-        if (mus) { var au = new Audio(mus); au.loop = true; audEl = au; }
-        ready = true; sync();
-        prefetch(list[idx + 1]);
-        vt = setInterval(tick, 50);
-      }).catch(function () {
-        if (my !== token) return;
-        setTimeout(function () { if (my === token) { idx++; draw(); } }, 700);
-      });
+          vd.onerror = skip;
+          vd.src = src; stage.appendChild(vd);
+          vidEl = {
+            play: function () { return vd.play(); }, pause: function () { vd.pause(); },
+            rate: function (r) { vd.playbackRate = r; }, time: function () { return vd.currentTime; },
+            dur: function () { return vd.duration; },
+            destroy: function () { try { vd.pause(); vd.removeAttribute('src'); vd.load(); } catch (e) {} }
+          };
+        }).catch(skip);
+      }
     }
     draw();
   }
-
   // who viewed / who liked (own status only)
   function openViews(x) {
     if (VC) VC.hold();
@@ -933,6 +1014,7 @@ var myList = [], contacts = [];
     var nr = row('🔔', T.notif, T.notifSub, function () { if (bell) bell.click(); });
     if (bell) { nr.appendChild(bell); bell.style.display = ''; bell.addEventListener('click', function (e) { e.stopPropagation(); }); bell.addEventListener('click', function () {}); }
     row('🔑', T.changePw, T.pwSub, changePassword);
+    row('✏️', T.changeName, T.nameSub, function () { if (window.ChatUsername) window.ChatUsername.open(renderSettings); });
     row('🔒', T.lockNow, T.lockSub, function () {
       try { sessionStorage.removeItem('mk_ok'); } catch (e) {}
       location.reload();
