@@ -132,13 +132,7 @@
   /* =================================================================
      2) TIMER ICON + PICKER
      ================================================================= */
-  var cfg = null;      // null = Auto (purana default). Warna { sec, mode:'seen'|'sent' }
-  try {
-    var j = JSON.parse(localStorage.getItem(LS_KEY));
-    if (j && j.sec >= SEC_MIN && j.sec <= SEC_MAX && (j.mode === 'seen' || j.mode === 'sent')) {
-      cfg = { sec: Math.floor(j.sec), mode: j.mode };
-    }
-  } catch (e) {}
+  var cfg = null;      // null = Auto (default). Ek hi message ke liye: bhejte hi wapas Auto ho jata hai.
 
   var bar = document.querySelector('#chatView .input-bar');
   var wrap = bar && bar.querySelector('.input-wrap');
@@ -157,17 +151,23 @@
   if (bar && camLbl) { bar.insertBefore(clip, camLbl); bar.appendChild(pick); }
 
   function paintBadge() {
-    badge.textContent = cfg ? cfg.sec + 's' : '';
+    badge.textContent = cfg ? (cfg.mode === 'keep' ? '\u221E' : cfg.sec + 's') : '';
     tBtn.classList.toggle('on', !!cfg);
     tBtn.classList.toggle('sent', !!cfg && cfg.mode === 'sent');
     tBtn.title = cfg
-      ? 'Timer: ' + fmtSec(cfg.sec) + (cfg.mode === 'sent' ? ' (before seen)' : ' (after seen)')
+      ? (cfg.mode === 'keep' ? 'Timer: Permanent' : 'Timer: ' + fmtSec(cfg.sec) + (cfg.mode === 'sent' ? ' (before seen)' : ' (after seen)')) + ' - sirf agla message'
       : 'Timer: Auto';
   }
   function saveCfg(c) {
     cfg = c;
-    try { if (c) localStorage.setItem(LS_KEY, JSON.stringify(c)); else localStorage.removeItem(LS_KEY); } catch (e) {}
     paintBadge();
+  }
+  // Message bhejte waqt: timer le lo aur turant Auto par wapas
+  function take() {
+    var c = cfg;
+    cfg = null;
+    paintBadge();
+    return c;
   }
   paintBadge();
 
@@ -190,7 +190,7 @@
     sh.innerHTML = '';
     var sel = cfg ? cfg.sec : 10, mode = cfg ? cfg.mode : 'seen';
 
-    sh.appendChild(h('div', 'sheet-title', '\u23F1 Message timer'));
+    sh.appendChild(h('div', 'sheet-title', '\u23F1 Message timer (sirf agla message)'));
     var big = h('div', 'adv-sel'); sh.appendChild(big);
 
     var box = h('div', 'adv-wheel-box'), wheel = h('div', 'adv-wheel');
@@ -210,7 +210,8 @@
     var seg = h('div', 'adv-seg');
     var bSeen = h('button', '', '\uD83D\uDC41 After seen'); bSeen.type = 'button';
     var bSent = h('button', '', '\u23F3 Before seen'); bSent.type = 'button';
-    seg.appendChild(bSeen); seg.appendChild(bSent);
+    var bKeep = h('button', '', '\u267E Permanent'); bKeep.type = 'button';
+    seg.appendChild(bSeen); seg.appendChild(bSent); seg.appendChild(bKeep);
     sh.appendChild(seg);
     var desc = h('div', 'adv-desc'); sh.appendChild(desc);
 
@@ -218,7 +219,10 @@
       big.textContent = fmtSec(sel);
       bSeen.classList.toggle('on', mode === 'seen');
       bSent.classList.toggle('on', mode === 'sent');
-      desc.textContent = mode === 'sent'
+      bKeep.classList.toggle('on', mode === 'keep');
+      desc.textContent = mode === 'keep'
+        ? 'Permanent: message hamesha rahega, jab tak koi delete na kare. (Photo aur video par ye nahi chalta - wo dekhne ke baad delete ho jayenge.)'
+        : mode === 'sent'
         ? 'Before seen: bhejte hi ' + fmtSec(sel) + ' ka timer chalu. Samne wale ne dekha ya nahi, ' + fmtSec(sel) + ' baad message gayab.'
         : 'After seen: samne wala message dekhega tab ' + fmtSec(sel) + ' ka timer chalu hoga, phir gayab.';
     }
@@ -235,6 +239,7 @@
     });
     bSeen.addEventListener('click', function () { mode = 'seen'; paint(); });
     bSent.addEventListener('click', function () { mode = 'sent'; paint(); });
+    bKeep.addEventListener('click', function () { mode = 'keep'; paint(); });
 
     var ok = h('button', 'sheet-btn', '\u2705 Timer set karo'); ok.type = 'button';
     ok.addEventListener('click', function () { saveCfg({ sec: sel, mode: mode }); closeSheet(); });
@@ -401,6 +406,10 @@
     v._b.appendChild(a);
     var note = h('div', 'adv-note', '\u23F3 Server se delete ho rahi hai...');
     v._b.appendChild(note);
+    if (d.mode === 'keep') {                    // permanent file: delete nahi karni
+      note.textContent = '\u267E Ye file permanent hai, server par rahegi.';
+      return;
+    }
 
     // Khulte hi delete: pehle seenAt, phir message hatao (blob chunks onRemoved se hatenge)
     var ref = C.getMsgRef(), m = C.getMsgs()[key];
@@ -412,7 +421,7 @@
     });
   }
 
-  // chat.js ke buildMessage se bulaya jata hai (type video / file)
+    // chat.js ke buildMessage se bulaya jata hai (type video / file)
   function buildMedia(key, d, m, box) {
     var isV = d.type === 'video';
     var card = h('div', 'advcard');
@@ -486,6 +495,7 @@
     if (f.size > MAX_BYTES) { alert('File ' + (MAX_BYTES / 1048576) + ' MB se chhoti honi chahiye'); return; }
 
     var ref = C.getMsgRef(), room = C.getRoom(), me = C.getMe();
+    var advCfg = take();                       // timer sirf is ek bhejne ke liye
     var name = safeName(f.name);
     var prog = h('div', 'msg mine adv-up', '\u2B06\uFE0F ' + name + ' taiyaar ho rahi hai...');
     var list = $('messages');
@@ -506,6 +516,7 @@
         }).then(function () {
           var meta = { from: me.uid, type: asVideo ? 'video' : 'file', fn: name, sz: f.size, nc: n, dur: asVideo ? ms : 60000, t: C.TS };
           if (/^[\w.+-]+\/[\w.+-]+$/.test(f.type || '') && f.type.length <= 100) meta.mime = f.type;
+          if (!asVideo && advCfg && advCfg.mode === 'keep') meta.mode = 'keep';     // permanent file (video nahi)
           return ref.child(key).set(meta);
         });
       });
@@ -529,9 +540,13 @@
 
   /* ---------- chat.js ke liye hooks ---------- */
   window.ChatAdv = {
-    // null = Auto (purana default). Warna { dur(ms), mode: 'sent' | null }
-    timerFor: function () {
-      return cfg ? { dur: cfg.sec * 1000, mode: cfg.mode === 'sent' ? 'sent' : null } : null;
+    // bhejte waqt: chuna hua timer lo aur Auto par wapas (ek message ke liye)
+    take: take,
+    // take() se mile timer ko message type ke hisab se badlo. null = default timer
+    apply: function (c, type) {
+      if (!c) return null;
+      if (c.mode === 'keep') return (type === 'photo' || type === 'video') ? null : { dur: null, mode: 'keep' };
+      return { dur: c.sec * 1000, mode: c.mode === 'sent' ? 'sent' : null };
     },
     buildMedia: buildMedia,
     onRemoved: onRemoved
