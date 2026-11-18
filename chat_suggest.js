@@ -136,11 +136,11 @@
     // IDs (digits only) are not usernames: nothing to suggest
     if (/^[0-9]+$/.test(typed)) { hide(); return; }
 
-    var pinMatch = !!CONFIG.PINNED && CONFIG.PINNED !== me && (!typed || CONFIG.PINNED.indexOf(typed) === 0);
-    var pinKnown = pinMatch && pinnedOk === true;
+      var pinMatch = !!CONFIG.PINNED && (!typed || CONFIG.PINNED.indexOf(typed) === 0);
+    var pinKnown = pinMatch;
 
-    if (!typed) {                       // empty box: only the pinned name
-      checkPinned().then(function (ok) { if (my === seq) draw('', me, pinMatch && ok, []); });
+    if (!typed) {                       // empty box: only the pinned name, shown at once
+      draw('', me, pinMatch, []);
       return;
     }
 
@@ -160,7 +160,7 @@
 
     // 2) real search from the first letter, runs on every letter typed
     var q = db.ref('chatNames').orderByKey().startAt(typed).endAt(typed + '\uf8ff').limitToFirst(CONFIG.MAX + 2).once('value');
-    Promise.all([pinMatch ? checkPinned() : Promise.resolve(false), q]).then(function (res) {
+        Promise.all([Promise.resolve(pinMatch), q]).then(function (res) {
       if (my !== seq) return;           // an older search finished late: ignore
       var names = [];
       res[1].forEach(function (c2) { names.push(c2.key); });
