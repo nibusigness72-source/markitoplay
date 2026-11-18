@@ -64,7 +64,11 @@
   form.parentNode.insertBefore(box, form.nextSibling);
 
   /* ---------------- helpers ---------------- */
-  function show() { box.style.display = 'block'; }
+  function show() {
+    // chat-status.js moves the search form into its own pane, so keep the list right under the form
+    if (box.previousSibling !== form) form.parentNode.insertBefore(box, form.nextSibling);
+    box.style.display = 'block';
+  }
   function hide() { box.style.display = 'none'; box.innerHTML = ''; }
 
   function row(name, typed, pin) {
