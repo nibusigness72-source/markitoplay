@@ -240,6 +240,28 @@ $('lkReset').addEventListener('click', function () {
   lockUI('reset');
   lkMsg('You are signed in to your account, so you can set a new password of ' + PASS_MIN + ' to ' + PASS_MAX + ' characters.');
 });
+  // Password reset = all chats wiped: my messages + files deleted, other person's messages hidden for me, chat list cleared
+function wipeAllChats() {
+  return db.ref('userChats/' + me.uid).once('value').then(function (s) {
+    var rooms = s.val() || {};
+    return Promise.all(Object.keys(rooms).map(function (room) {
+      return db.ref('chats/' + room + '/messages').once('value').then(function (ms) {
+        var up = {};
+        ms.forEach(function (m) {
+          var d = m.val() || {};
+          if (d.from === me.uid) {
+            up['chats/' + room + '/messages/' + m.key] = null;
+            if (d.type === 'video' || d.type === 'file') up['chatBlobs/' + room + '/' + m.key] = null;
+          } else {
+            up['chatHidden/' + me.uid + '/' + room + '/' + m.key] = true;
+          }
+        });
+        up['userChats/' + me.uid + '/' + room] = null;
+        return db.ref().update(up);
+      });
+    }));
+  });
+}
 $('lkGo').addEventListener('click', function () {
   var pw = $('lkPass').value;
   if (charCount(pw) < PASS_MIN || charCount(pw) > PASS_MAX) { lkMsg('Password must be ' + PASS_MIN + ' to ' + PASS_MAX + ' characters (now ' + charCount(pw) + ')', true); return; }
@@ -251,9 +273,12 @@ $('lkGo').addEventListener('click', function () {
       unlocked();
     }).catch(fail);
   } else if (lockMode === 'reset') {
-    if (!confirm('Set a new password? Your old password will stop working.')) { lkMsg(''); return; }
+    if (!confirm('Reset password? ALL your chats, messages and chat list will be deleted permanently.')) { lkMsg(''); return; }
     var s1 = rhex(12);
-    sha(s1 + ':' + pw).then(function (h) {
+    lkMsg('Deleting your chats...');
+    wipeAllChats().then(function () {
+      return sha(s1 + ':' + pw);
+    }).then(function (h) {
       return db.ref('chatAuth/' + me.uid).set({ h: h, s: s1, u: lockAuth.u }).then(function () { lockAuth = { h: h, s: s1, u: lockAuth.u }; unlocked(); });
     }).catch(fail);
   } else {
