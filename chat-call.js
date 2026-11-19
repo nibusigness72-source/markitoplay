@@ -533,8 +533,9 @@
         var data = { from: me.uid, to: peer.uid, st: 'ring', t: TS, offer: { type: d.type, sdp: d.sdp } };
         if (vid) data.vid = true;
         return db.ref('calls/' + room).set(data);
-      }).then(function () {
+            }).then(function () {
         openReady(c); listenIce(c);
+        C.touchPeer();   // samne wale ki chat list mein mera naam, ID, photo jod do (message jaisa)
         var inb = { room: room, from: me.uid, n: (me.cname || me.name || 'Player').slice(0, 30), t: TS };
         if (vid) inb.vid = true;
         return db.ref('callInbox/' + peer.uid).set(inb);
